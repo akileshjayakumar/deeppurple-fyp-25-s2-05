@@ -3,7 +3,7 @@
 ## Project Information
 **Project ID:** CSIT-25-S2-21  
 **Proposed Title:** DeepPurple  
-**Current Date:** Saturday, April 05, 2025, 7:28 PM +08  
+**Project Start Date:** Saturday, April 05, 2025
 
 ## Project Description
 Effective communication is about more than just exchanging information. It’s about understanding the emotions and intentions behind the words. **DeepPurple** is the solution.
