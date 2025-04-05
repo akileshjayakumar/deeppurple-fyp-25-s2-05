@@ -17,7 +17,7 @@ Through its AI engine, this natural language analysis software mines emotions, i
 ---
 
 ## Technologies Used
-- **OpenAI GPT-3**
+- **OpenAI API**
 - **React**
 - **Spring Boot**
 - **AWS Lambda**
