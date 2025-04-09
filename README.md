@@ -1,7 +1,7 @@
 # UOW FYP - DeepPurple - S2 2025
 
 ## Project Information
-**Project ID:** CSIT-25-S2-21  
+**Group Number:** FYP-S2-25-05
 **Proposed Title:** DeepPurple  
 **Project Start Date:** Saturday, April 05, 2025
 
