@@ -16,17 +16,3 @@ DeepPurple is a text analysis software that automates the process of analyzing c
 Through its AI engine, this natural language analysis software mines emotions, identifies their context, and presents insights in an interactive and adaptive user interface (UI). Companies will be empowered to better understand their clients and customize their approach to every aspect of their business. Additionally, DeepPurple offers comprehensive insights into both detailed and general trends over time.
 
 **We turn words into insights.**
-
----
-
-## Technologies Used/Tech Stack
-
-- **OpenAI API**
-- **React**
-- **Python**
-- **AWS Lambda**
-- **AWS Elastic Beanstalk**
-- **AWS RDS**
-- **AWS Amplify**
-
----
