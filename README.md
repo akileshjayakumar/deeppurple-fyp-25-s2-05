@@ -1,4 +1,4 @@
-# UOW FYP - DeepPurple - S2 2025
+# UOW Final Year Project - DeepPurple - S2 2025
 
 ## Project Information
 
