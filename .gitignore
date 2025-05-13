@@ -1,0 +1,89 @@
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+.sass-cache/
+.nyc_output/
+coverage/
+*.log
+*.tsbuildinfo
+*.swp
+*.swo
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+env/
+venv/
+ENV/
+*.sqlite3
+*.db
+*.log
+*.pot
+*.mo
+*.pyc
+*.pyo
+*.pyd
+*.mypy_cache/
+*.coverage
+.coverage.*
+.cache
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Docker
+*.dockerfile
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+
+# Miscellaneous
+*.bak
+*.tmp
+*.swp
+*.swo
+*.orig
+*.rej
+*.log
+*.pid
+*.seed
+*.pid.lock
+*.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local
