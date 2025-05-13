@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", "postgresql://postgres:postgres@localhost/deeppurple")
     DB_USERNAME: str = os.getenv("DB_USERNAME", "postgres")
-    DB_PASSWORD: str = os.getenv("DB_PASSWORD", "postgres")
+    DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")  
     DB_NAME: str = os.getenv("DB_NAME", "deeppurple")
     DB_PORT: str = os.getenv("DB_PORT", "5432")
 
