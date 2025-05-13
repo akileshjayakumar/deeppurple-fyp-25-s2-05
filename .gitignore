@@ -66,11 +66,6 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
-# Docker
-*.dockerfile
-Dockerfile
-docker-compose.yml
-docker-compose.override.yml
 
 # Miscellaneous
 *.bak
