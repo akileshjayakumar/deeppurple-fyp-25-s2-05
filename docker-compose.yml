@@ -28,7 +28,7 @@ services:
     env_file:
       - ./server/.env
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@deeppurple-db:5432/deeppurple
+      - DATABASE_URL=postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-changeme}@deeppurple-db:5432/${DB_NAME:-deeppurple}
       - DEPLOYMENT_ENV=development
       - USE_SQLITE=false
       - CLIENT_DOMAIN=localhost
@@ -48,7 +48,7 @@ services:
     container_name: deeppurple-db
     environment:
       - POSTGRES_USER=${DB_USERNAME:-postgres}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-changeme}
       - POSTGRES_DB=${DB_NAME:-deeppurple}
     ports:
       - "5432:5432"
