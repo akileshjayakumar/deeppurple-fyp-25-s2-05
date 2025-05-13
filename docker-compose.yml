@@ -1,0 +1,71 @@
+services:
+  deeppurple-client:
+    build:
+      context: ./client
+      dockerfile: build/Dockerfile
+    container_name: deeppurple-client
+    ports:
+      - "3000:80"
+    depends_on:
+      - deeppurple-server
+    restart: unless-stopped
+    volumes:
+      - ./client/src:/app/src
+      - ./client/public:/app/public
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_TELEMETRY_DISABLED=1
+    networks:
+      - deeppurple-network
+
+  deeppurple-server:
+    build:
+      context: ./server
+      dockerfile: build/Dockerfile
+    container_name: deeppurple-server
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./server/.env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@deeppurple-db:5432/deeppurple
+      - DEPLOYMENT_ENV=development
+      - USE_SQLITE=false
+      - CLIENT_DOMAIN=localhost
+      - DEBUG=true
+    depends_on:
+      deeppurple-db:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./server/src:/app
+      - ./server/.env:/app/.env
+    networks:
+      - deeppurple-network
+
+  deeppurple-db:
+    image: postgres:14
+    container_name: deeppurple-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=deeppurple
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - deeppurple-network
+
+volumes:
+  postgres_data:
+
+networks:
+  deeppurple-network:
+    driver: bridge
