@@ -81,4 +81,8 @@ docker-compose.yml
 
 # Miscellaneous
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Exclude build/requirements.txt and src/
+!build/requirements.txt
+!src/ 

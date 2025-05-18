@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y \
     libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements file
-COPY src/requirements.txt .
+# Copy requirements file from build directory
+COPY build/requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
