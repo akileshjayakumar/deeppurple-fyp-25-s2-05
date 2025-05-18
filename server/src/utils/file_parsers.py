@@ -133,11 +133,17 @@ def parse_file_content(content: bytes, file_type: str) -> str:
             logger.warning("Empty file content received")
             return "This file appears to be empty. Please upload a file with content to analyze."
 
+        # Log content details for debugging
+        logger.debug(f"Content byte length: {len(content)}")
+        logger.debug(f"Content starts with: {content[:100]}..." if len(
+            content) > 100 else f"Content: {content}")
+
         # Parse based on file type
         if file_type.lower() == 'txt':
             logger.debug("Parsing TXT file")
             parsed_content = parse_txt_file(content)
             if not parsed_content or not parsed_content.strip():
+                logger.warning("TXT file parsed but content is empty")
                 return "This file appears to be empty. Please upload a file with content to analyze."
             logger.info(
                 f"Successfully parsed TXT file: {len(parsed_content)} characters")
@@ -146,6 +152,7 @@ def parse_file_content(content: bytes, file_type: str) -> str:
             logger.debug("Parsing CSV file")
             parsed_content = parse_csv_file(content)
             if not parsed_content or not parsed_content.strip():
+                logger.warning("CSV file parsed but content is empty")
                 return "This CSV file appears to be empty. Please upload a file with content to analyze."
             logger.info(
                 f"Successfully parsed CSV file: {len(parsed_content)} characters")
@@ -154,6 +161,7 @@ def parse_file_content(content: bytes, file_type: str) -> str:
             logger.debug("Parsing PDF file")
             parsed_content = parse_pdf_file(content)
             if not parsed_content or not parsed_content.strip():
+                logger.warning("PDF file parsed but content is empty")
                 return "This PDF file appears to be empty. Please upload a file with content to analyze."
             logger.info(
                 f"Successfully parsed PDF file: {len(parsed_content)} characters")

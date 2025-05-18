@@ -132,15 +132,26 @@ async def upload_file(
         # Parse file content and store it
         try:
             # Get file from S3 since we've already uploaded it
-            logger.debug(f"Retrieving file content from S3")
+            logger.debug(f"Retrieving file content from S3 with key: {s3_key}")
             file_content_bytes = get_file_from_s3(s3_key)
+
+            if not file_content_bytes:
+                logger.error(
+                    f"Failed to retrieve file content from S3 for key: {s3_key}")
+                # Use the content we already have in memory
+                logger.info(
+                    f"Using cached file content, size: {len(content)} bytes")
+                file_content_bytes = content
 
             # Parse the content based on file type
             logger.debug(f"Parsing file content, type: {file_type}")
             parsed_content = parse_file_content(file_content_bytes, file_type)
+            logger.debug(
+                f"Parsed content length: {len(parsed_content) if parsed_content else 0}")
 
             # Store the content in the database
-            logger.debug(f"Storing file content in database")
+            logger.debug(
+                f"Storing file content in database for file_id: {new_file.id}")
             file_content = FileContent(
                 file_id=new_file.id,
                 content=parsed_content
@@ -149,6 +160,26 @@ async def upload_file(
             db.add(file_content)
             db.commit()
             logger.info(f"File content stored successfully")
+
+            # Verify file content was saved
+            content_check = db.query(FileContent).filter(
+                FileContent.file_id == new_file.id).first()
+            if content_check:
+                logger.info(
+                    f"Verified file content was saved with length: {len(content_check.content)}")
+
+                # Also verify that relationship works correctly
+                file_with_content = db.query(File).filter(
+                    File.id == new_file.id).first()
+                if file_with_content and file_with_content.contents:
+                    logger.info(
+                        f"File-to-content relationship verified: {file_with_content.id} -> {file_with_content.contents.id}")
+                else:
+                    logger.warning(
+                        f"File-to-content relationship not working for file_id: {new_file.id}")
+            else:
+                logger.warning(
+                    f"Failed to verify file content was saved for file_id: {new_file.id}")
         except Exception as e:
             # Log the error but don't fail the upload
             logger.error(f"Error parsing file content: {str(e)}")

@@ -204,20 +204,57 @@ async def analyze_file(
             detail="File not found"
         )
 
-    # Get file content
-    file_content = db.query(FileContent).filter(
-        FileContent.file_id == file.id).first()
+    # Get all file contents for the session to use as context
+    file_contents = db.query(FileContent).join(File).filter(
+        File.session_id == file.session_id
+    ).all()
 
-    if not file_content:
-        logger.warning(f"File content not found for file {file_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File content not found"
-        )
+    logger.debug(
+        f"File content query: session_id={file.session_id}, found {len(file_contents) if file_contents else 0} files")
+
+    # Additional debugging - check if files exist without content
+    files_without_content = db.query(File).filter(
+        File.session_id == file.session_id
+    ).all()
+    logger.debug(
+        f"Files in session: {len(files_without_content) if files_without_content else 0}")
+
+    if files_without_content and not file_contents:
+        # Files exist but no content found - potential join issue
+        logger.warning(
+            f"Files exist in session {file.session_id} but no content found. Trying direct relationship.")
+
+        # Try accessing contents directly through relationship
+        direct_content_list = []
+        for file in files_without_content:
+            logger.debug(f"Checking file {file.id} for contents")
+            if hasattr(file, 'contents') and file.contents:
+                logger.debug(
+                    f"Found content for file {file.id} using direct relationship")
+                direct_content_list.append(file.contents)
+
+        if direct_content_list:
+            logger.info(
+                f"Retrieved {len(direct_content_list)} file contents using direct relationships")
+            file_contents = direct_content_list
+        else:
+            # If still no content, try looking up directly by file IDs
+            file_ids = [f.id for f in files_without_content]
+            logger.debug(
+                f"Looking up content directly by file IDs: {file_ids}")
+
+            direct_file_contents = db.query(FileContent).filter(
+                FileContent.file_id.in_(file_ids)
+            ).all()
+
+            if direct_file_contents:
+                logger.info(
+                    f"Found {len(direct_file_contents)} file contents when querying directly by file_id")
+                file_contents = direct_file_contents
 
     # Analyze the content
     logger.info(f"Analyzing content for file {file.filename}")
-    analysis_results = analyze_text(file_content.content)
+    analysis_results = analyze_text(file_contents[0])
     logger.info(f"Analysis complete for file {file.filename}")
 
     # Store insights
@@ -295,6 +332,42 @@ async def ask_question(
         File.session_id == session.id
     ).all()
 
+    logger.debug(
+        f"File content query: session_id={session.id}, found {len(file_contents) if file_contents else 0} files")
+
+    # If no content found, try the direct relationship method
+    if not file_contents:
+        logger.info(
+            f"Using direct relationship navigation for session {session.id}")
+        file_contents = session.get_all_file_contents()
+        logger.debug(
+            f"Direct navigation found {len(file_contents)} file contents")
+
+    # Additional debugging - check if files exist without content
+    files_without_content = db.query(File).filter(
+        File.session_id == session.id
+    ).all()
+    logger.debug(
+        f"Files in session: {len(files_without_content) if files_without_content else 0}")
+
+    if files_without_content and not file_contents:
+        # Files exist but no content found - potential join issue
+        logger.warning(
+            f"Files exist in session {session.id} but no content found. Trying direct relationship.")
+        # Get file IDs for debugging
+        file_ids = [f.id for f in files_without_content]
+        logger.debug(f"File IDs in session: {file_ids}")
+
+        # Try to query file contents directly by file IDs
+        direct_file_contents = db.query(FileContent).filter(
+            FileContent.file_id.in_(file_ids)
+        ).all()
+
+        if direct_file_contents:
+            logger.info(
+                f"Found {len(direct_file_contents)} file contents when querying directly by file_id")
+            file_contents = direct_file_contents
+
     # Get previous questions and answers for this session (conversation history)
     # Use the history_limit from the request, defaulting to 5
     history_limit = question_request.history_limit if question_request.history_limit is not None else 5
@@ -314,101 +387,122 @@ async def ask_question(
 
     if not file_contents:
         logger.warning(f"No file contents found for session {session.id}")
-        # No files uploaded, but we can still try to be helpful
+        # No files uploaded, but we should still answer the question using general knowledge
+        logger.info(
+            "Answering question using general knowledge without file context")
 
-        # Try to analyze the question text itself as if it were content
         try:
-            # First check if the question is actually text to analyze
-            if (len(question_request.question) > 30 and
-                not question_request.question.endswith("?") and
-                    "analyze" in question_request.question.lower()):
-                # This looks like content to analyze rather than a question
-                logger.info(
-                    "Question appears to be text for analysis, processing as text")
-                analysis_results = analyze_text(question_request.question)
+            # Use conversation history for context
+            answer_text, sources = answer_question(
+                question_request.question,
+                "",  # Empty context, rely on model's general knowledge
+                conversation_history
+            )
 
-                answer = f"""I've analyzed the text you provided:
+            logger.info("Generated answer from general knowledge")
 
-Sentiment: {analysis_results["sentiment"].get("overall", "Neutral")}
-- Positive: {analysis_results["sentiment"].get("positive", 0)*100:.1f}%
-- Negative: {analysis_results["sentiment"].get("negative", 0)*100:.1f}%
-- Neutral: {analysis_results["sentiment"].get("neutral", 0)*100:.1f}%
+            # Store the question and answer
+            question = Question(
+                session_id=session.id,
+                question_text=question_request.question,
+                answer_text=answer_text
+            )
+            db.add(question)
+            db.commit()
 
-Dominant Emotion: {analysis_results["emotions"].get("dominant_emotion", "Neutral")}
-
-Topics: {", ".join([t.get("name", t) if isinstance(t, dict) else t for t in analysis_results["topics"]]) if isinstance(analysis_results["topics"], list) else "None detected"}
-
-Summary: {analysis_results["summary"]}"""
-            else:
-                # Try to provide a helpful response based on general sentiment analysis knowledge
-                logger.info(
-                    "Generating informative response about sentiment analysis")
-
-                # Simplified context for common sentiment analysis questions
-                general_context = """
-                Sentiment analysis is the process of determining the emotional tone behind a series of words.
-                It involves categorizing opinions in text into categories like "positive," "negative," and "neutral."
-                
-                Common sentiment analysis metrics include:
-                - Polarity: How positive or negative the text is (usually from -1 to 1)
-                - Subjectivity: How subjective or objective the text is
-                - Emotion detection: Identifying emotions like joy, sadness, anger, fear
-                
-                Sentiment analysis uses techniques like:
-                - Lexicon-based methods using dictionaries of words with sentiment scores
-                - Machine learning approaches using labeled data
-                - Deep learning models like BERT and transformers
-                
-                Applications include:
-                - Brand monitoring and reputation management
-                - Customer feedback analysis
-                - Market research and competitive intelligence
-                - Social media monitoring
-                - Product review analysis
-                """
-
-                # If OpenAI is not available, provide a fallback response
-                if not settings.OPENAI_API_KEY:
-                    logger.warning(
-                        "OpenAI API key not available, using fallback response")
-                    answer = "I can help answer questions about sentiment analysis and emotion detection. To analyze text, you can either upload a file or paste your text directly in the chat."
-                else:
-                    try:
-                        answer, _ = answer_question(
-                            question_request.question,
-                            general_context,
-                            conversation_history
-                        )
-                    except Exception as e:
-                        logger.error(
-                            f"Error using OpenAI for question answering: {str(e)}")
-                        # Fallback to a generic response
-                        answer = "I can help analyze text for sentiment and emotions. You can either upload a file for analysis or enter text directly in your message."
-
+            return {
+                "answer": answer_text,
+                "sources": sources if sources else [],
+                "conversation_history": conversation_history
+            }
         except Exception as e:
-            logger.error(f"Error generating response without files: {str(e)}")
+            logger.error(f"Error answering general question: {str(e)}")
             logger.error(traceback.format_exc())
-            answer = "I can help analyze text for sentiment and emotions. You can either upload a file for analysis or enter text directly in your message."
 
-        # Store the question and answer
-        question = Question(
-            session_id=session.id,
-            question_text=question_request.question,
-            answer_text=answer
-        )
-        db.add(question)
-        db.commit()
+            # Fallback message if the model fails
+            answer = (
+                "I can answer general questions or analyze uploaded files. "
+                "For more specific analysis, you can upload a file or paste text directly in the chat. "
+                "What would you like to know?"
+            )
 
-        return {
-            "answer": answer,
-            "sources": [],
-            "conversation_history": conversation_history
-        }
+            # Store the question and answer
+            question = Question(
+                session_id=session.id,
+                question_text=question_request.question,
+                answer_text=answer
+            )
+            db.add(question)
+            db.commit()
+
+            return {
+                "answer": answer,
+                "sources": [],
+                "conversation_history": conversation_history
+            }
 
     # We have files, so proceed with normal processing
     # Combine all file contents into a single context
     context = "\n\n".join([fc.content for fc in file_contents])
     logger.debug(f"Combined context length: {len(context)} characters")
+
+    # Check if the question contains substantial text (more than 100 characters)
+    # This could indicate the user pasted text directly in the question
+    contains_pasted_text = len(question_request.question) > 100
+
+    if not file_contents and contains_pasted_text:
+        logger.info(
+            f"Question appears to contain pasted text ({len(question_request.question)} chars). Using as context.")
+
+        # Extract text from the question to use as context
+        # We'll add a marker to help the model distinguish the question from the context
+        if "?" in question_request.question:
+            # Try to separate the question from the context based on the question mark
+            parts = question_request.question.split("?", 1)
+            # If there's substantial text after the question mark
+            if len(parts) > 1 and len(parts[1]) > 50:
+                actual_question = parts[0] + "?"
+                context_from_question = parts[1].strip()
+                logger.debug(
+                    f"Split question: '{actual_question}' and context: '{context_from_question[:50]}...'")
+            else:
+                # No clear separation, treat the whole thing as context
+                # and add a generic question about analysis
+                actual_question = "Can you analyze this text for me?"
+                context_from_question = question_request.question
+        else:
+            # No question mark, treat the whole thing as context
+            # and add a generic question about analysis
+            actual_question = "Can you analyze this text for me?"
+            context_from_question = question_request.question
+
+        try:
+            # Use the extracted context and question
+            answer_text, sources = answer_question(
+                actual_question,
+                context_from_question,
+                conversation_history
+            )
+
+            logger.info("Generated answer from pasted text in question")
+
+            # Store the original question and answer
+            question = Question(
+                session_id=session.id,
+                question_text=question_request.question,
+                answer_text=answer_text
+            )
+            db.add(question)
+            db.commit()
+
+            return {
+                "answer": answer_text,
+                "sources": sources if sources else [],
+                "conversation_history": conversation_history
+            }
+        except Exception as e:
+            logger.error(f"Error analyzing pasted text: {str(e)}")
+            logger.error(traceback.format_exc())
 
     # Answer the question with conversation history context
     logger.info(f"Processing question: {question_request.question[:50]}...")
@@ -488,6 +582,57 @@ async def stream_question_answer(
         File.session_id == session.id
     ).all()
 
+    logger.debug(
+        f"File content query (stream): session_id={session.id}, found {len(file_contents) if file_contents else 0} files")
+
+    # If no content found, try the direct relationship method
+    if not file_contents:
+        logger.info(
+            f"Using direct relationship navigation for stream in session {session.id}")
+        file_contents = session.get_all_file_contents()
+        logger.debug(
+            f"Direct navigation found {len(file_contents)} file contents for streaming")
+
+    # Additional debugging - check if files exist without content
+    files_without_content = db.query(File).filter(
+        File.session_id == session.id
+    ).all()
+    logger.debug(
+        f"Files in session (stream): {len(files_without_content) if files_without_content else 0}")
+
+    if files_without_content and not file_contents:
+        # Files exist but no content found - potential join issue
+        logger.warning(
+            f"Files exist in session {session.id} but no content found. Trying direct relationship.")
+
+        # Try accessing contents directly through relationship
+        direct_content_list = []
+        for file in files_without_content:
+            logger.debug(f"Checking file {file.id} for contents")
+            if hasattr(file, 'contents') and file.contents:
+                logger.debug(
+                    f"Found content for file {file.id} using direct relationship")
+                direct_content_list.append(file.contents)
+
+        if direct_content_list:
+            logger.info(
+                f"Retrieved {len(direct_content_list)} file contents using direct relationships")
+            file_contents = direct_content_list
+        else:
+            # If still no content, try looking up directly by file IDs
+            file_ids = [f.id for f in files_without_content]
+            logger.debug(
+                f"Looking up content directly by file IDs: {file_ids}")
+
+            direct_file_contents = db.query(FileContent).filter(
+                FileContent.file_id.in_(file_ids)
+            ).all()
+
+            if direct_file_contents:
+                logger.info(
+                    f"Found {len(direct_file_contents)} file contents when querying directly by file_id")
+                file_contents = direct_file_contents
+
     # Get previous questions and answers (conversation history)
     history_limit = question_request.history_limit if question_request.history_limit is not None else 5
     previous_questions = db.query(Question).filter(
@@ -505,12 +650,70 @@ async def stream_question_answer(
     async def generate_stream():
         complete_answer = ""
 
-        if not file_contents:
+        # Check if the question contains substantial text (more than 100 characters)
+        # This could indicate the user pasted text directly in the question
+        contains_pasted_text = len(question_request.question) > 100
+
+        if not file_contents and contains_pasted_text:
+            logger.info(
+                f"Stream: Question appears to contain pasted text ({len(question_request.question)} chars)")
+
+            # Extract text from the question to use as context
+            if "?" in question_request.question:
+                # Try to separate the question from the context based on the question mark
+                parts = question_request.question.split("?", 1)
+                # If there's substantial text after the question mark
+                if len(parts) > 1 and len(parts[1]) > 50:
+                    actual_question = parts[0] + "?"
+                    context_from_question = parts[1].strip()
+                    logger.debug(
+                        f"Stream: Split into question: '{actual_question}' and context")
+                else:
+                    # No clear separation, treat the whole thing as context
+                    actual_question = "Can you analyze this text for me?"
+                    context_from_question = question_request.question
+            else:
+                # No question mark, treat the whole thing as context
+                actual_question = "Can you analyze this text for me?"
+                context_from_question = question_request.question
+
+            # Stream a response using the pasted text as context
+            try:
+                async for token in answer_question_stream(
+                    actual_question,
+                    context_from_question,
+                    conversation_history
+                ):
+                    complete_answer += token
+                    yield token
+            except Exception as e:
+                logger.error(
+                    f"Error streaming answer for pasted text: {str(e)}")
+                error_msg = f"I'm having trouble analyzing your text. Please try again."
+                complete_answer = error_msg
+                yield error_msg
+        elif not file_contents:
             logger.warning(f"No file contents found for session {session.id}")
-            # No files, provide a helpful response anyway
-            async for token in mock_stream_response(question_request.question):
-                complete_answer += token
-                yield token
+            # No files, but we should still answer using general knowledge
+            logger.info(
+                "Streaming answer using general knowledge without file context")
+
+            # Stream a general knowledge response
+            try:
+                # Use the existing answer_question_stream but with empty context
+                async for token in answer_question_stream(
+                    question_request.question,
+                    "",  # Empty context, rely on model's general knowledge
+                    conversation_history
+                ):
+                    complete_answer += token
+                    yield token
+            except Exception as e:
+                logger.error(
+                    f"Error streaming general knowledge answer: {str(e)}")
+                error_msg = f"I'm having trouble processing your question. Please try again."
+                complete_answer = error_msg
+                yield error_msg
         else:
             # We have files, process normally
             # Combine all file contents into a single context
@@ -548,17 +751,18 @@ async def stream_question_answer(
         except Exception as e:
             logger.error(f"Failed to store question in database: {str(e)}")
 
-    # Helper function for mock streaming when no files are available
+    # Helper function for streaming general knowledge responses when no files are available
+    # This is now deprecated as we use the main LLM model instead
     async def mock_stream_response(question: str):
-        intro = "I don't see any files in this session that I can reference. "
+        intro = "I'll answer based on my general knowledge since no files are available. "
         for char in intro:
             yield char
             await asyncio.sleep(0.01)
 
         if "analyze" in question.lower() and len(question) > 20:
-            msg = "I can analyze the text in your question instead. Would you like me to do that? Or you can upload a file for more comprehensive analysis."
+            msg = "I can analyze the text in your question instead. Or you can upload a file for more comprehensive analysis."
         else:
-            msg = "You can upload a file to analyze, or I can answer general questions about sentiment analysis and text processing."
+            msg = "I can answer general questions or help you analyze uploaded files. What else would you like to know?"
 
         for char in msg:
             yield char

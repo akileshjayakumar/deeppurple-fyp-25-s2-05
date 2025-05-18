@@ -68,6 +68,7 @@ class Settings(BaseSettings):
         """Pydantic settings configuration."""
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "allow"  # Allow extra fields in the settings
 
 
 # Create settings instance that will be imported from this module

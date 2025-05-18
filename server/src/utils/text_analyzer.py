@@ -203,7 +203,8 @@ def answer_question(question: str, context: str, conversation_history: List[Dict
         # Create the chat template
         system_message = SystemMessagePromptTemplate.from_template(
             "You are a helpful assistant that answers questions based on provided context. "
-            "If the answer cannot be found in the context, state that clearly."
+            "If the context is empty, use your general knowledge to provide a helpful answer. "
+            "If the answer cannot be found in the provided context, state that clearly and offer what you know about the topic."
         )
 
         human_message = HumanMessagePromptTemplate.from_template(
@@ -212,7 +213,7 @@ def answer_question(question: str, context: str, conversation_history: List[Dict
             "Question: {question}\n\n"
             "Provide your answer in the following format:\n"
             "Answer: [Your comprehensive answer here]\n"
-            "Sources: [List of relevant segments from the context that support your answer]"
+            "Sources: [List of relevant segments from the context that support your answer, or 'General knowledge' if using general knowledge]"
         )
 
         chat_prompt = ChatPromptTemplate.from_messages(
@@ -304,7 +305,8 @@ async def answer_question_stream(question: str, context: str, conversation_histo
         # Create the chat template
         system_message = SystemMessagePromptTemplate.from_template(
             "You are a helpful assistant that answers questions based on provided context. "
-            "If the answer cannot be found in the context, state that clearly."
+            "If the context is empty, use your general knowledge to provide a helpful answer. "
+            "If the answer cannot be found in the provided context, state that clearly and offer what you know about the topic."
         )
 
         human_message = HumanMessagePromptTemplate.from_template(

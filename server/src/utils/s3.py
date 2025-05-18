@@ -93,7 +93,7 @@ def upload_file_to_s3(
         s3_key = f"{session_id if session_id else 'general'}/{unique_id}_{original_filename}"
 
         # In development mode, save to local filesystem
-        if not os.getenv("AWS_ACCESS_KEY_ID"):
+        if not os.getenv("AWS_ACCESS_KEY_ID") or settings.AWS_S3_USE_LOCAL:
             logger.info(
                 f"Running in development mode, saving to local file: {s3_key}")
 
@@ -111,6 +111,9 @@ def upload_file_to_s3(
             # Define the file path
             file_path = os.path.join(uploads_dir, s3_key)
 
+            # Ensure directory exists (for nested paths)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
             # Read the file data
             if isinstance(file, UploadFile):
                 # For FastAPI UploadFile, we need to get the file data
@@ -119,9 +122,14 @@ def upload_file_to_s3(
                 file.file.seek(0)
             else:
                 # For regular file objects like BytesIO
-                current_pos = file.tell()
-                file_content = file.read()
-                file.seek(current_pos)  # Reset position
+                if hasattr(file, 'tell') and hasattr(file, 'seek'):
+                    current_pos = file.tell()
+                    file_content = file.read()
+                    file.seek(current_pos)  # Reset position
+                else:
+                    # Handle raw bytes
+                    file_content = file if isinstance(
+                        file, bytes) else file.read()
 
             # Write to disk
             with open(file_path, 'wb') as f:
@@ -130,9 +138,32 @@ def upload_file_to_s3(
             logger.info(f"File saved to {file_path}")
             return s3_key
 
-        # In production, this would use boto3 to upload to AWS S3
-        # For now, we'll just return the key as if it was uploaded
-        logger.info(f"Simulating S3 upload for {s3_key}")
+        # In production, use boto3 to upload to AWS S3
+        s3_client = get_s3_client()
+        bucket_name = settings.AWS_BUCKET_NAME
+
+        # Read the file content
+        if isinstance(file, UploadFile):
+            file_content = file.file.read()
+            file.file.seek(0)  # Reset position
+        else:
+            # For regular file objects like BytesIO
+            if hasattr(file, 'tell') and hasattr(file, 'seek'):
+                current_pos = file.tell()
+                file_content = file.read()
+                file.seek(current_pos)  # Reset position
+            else:
+                # Handle raw bytes
+                file_content = file if isinstance(file, bytes) else file.read()
+
+        # Upload to S3
+        s3_client.put_object(
+            Bucket=bucket_name,
+            Key=s3_key,
+            Body=file_content
+        )
+
+        logger.info(f"File uploaded to S3: {s3_key}")
         return s3_key
 
     except Exception as e:
@@ -152,7 +183,7 @@ def get_file_from_s3(s3_key: str) -> bytes:
     """
     try:
         # In development mode, read from local filesystem
-        if not os.getenv("AWS_ACCESS_KEY_ID"):
+        if not os.getenv("AWS_ACCESS_KEY_ID") or settings.AWS_S3_USE_LOCAL:
             logger.info(
                 f"Running in development mode, reading local file: {s3_key}")
             file_path = os.path.join(os.getcwd(), 'uploads', s3_key)
@@ -162,12 +193,28 @@ def get_file_from_s3(s3_key: str) -> bytes:
                 return b""
 
             with open(file_path, 'rb') as f:
-                return f.read()
+                file_content = f.read()
+                logger.debug(
+                    f"Read {len(file_content)} bytes from local file: {s3_key}")
+                return file_content
 
-        # In production, this would use boto3 to get from AWS S3
-        # For now, just return empty bytes
-        logger.warning("S3 retrieval not implemented in production mode")
-        return b""
+        # In production, use boto3 to get from AWS S3
+        try:
+            s3_client = get_s3_client()
+            bucket_name = settings.AWS_BUCKET_NAME
+
+            response = s3_client.get_object(
+                Bucket=bucket_name,
+                Key=s3_key
+            )
+
+            file_content = response['Body'].read()
+            logger.debug(f"Read {len(file_content)} bytes from S3: {s3_key}")
+            return file_content
+
+        except ClientError as e:
+            logger.error(f"S3 client error: {str(e)}")
+            return b""
 
     except Exception as e:
         logger.error(f"Error in get_file_from_s3: {str(e)}")

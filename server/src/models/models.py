@@ -84,6 +84,21 @@ class Session(Base):
     questions = relationship(
         "Question", back_populates="session", cascade="all, delete-orphan")
 
+    # Helper methods
+    def get_all_file_contents(self):
+        """Get all file contents for this session using direct relationship navigation.
+
+        This avoids join issues when querying file contents directly.
+
+        Returns:
+            List of FileContent objects for all files in this session.
+        """
+        contents = []
+        for file in self.files:
+            if file.contents:
+                contents.append(file.contents)
+        return contents
+
 
 class File(Base):
     """
