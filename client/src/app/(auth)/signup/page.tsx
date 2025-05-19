@@ -15,6 +15,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,6 +26,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 
 const signupSchema = z
@@ -39,11 +42,31 @@ const signupSchema = z
     confirmPassword: z
       .string()
       .min(8, { message: "Confirm password must be at least 8 characters" }),
+    role: z.enum(["admin", "user"], {
+      required_error: "You need to select a role",
+    }),
+    tier: z
+      .enum(["basic", "premium"], {
+        required_error: "You need to select a tier",
+      })
+      .optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
     path: ["confirmPassword"],
-  });
+  })
+  .refine(
+    (data) => {
+      if (data.role === "user") {
+        return data.tier !== undefined;
+      }
+      return true;
+    },
+    {
+      message: "You need to select a tier as an End-User",
+      path: ["tier"],
+    }
+  );
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
@@ -58,13 +81,26 @@ export default function SignupPage() {
       email: "",
       password: "",
       confirmPassword: "",
+      role: "user",
     },
+    mode: "onChange",
   });
+
+  const watchRole = form.watch("role");
 
   async function onSubmit(data: SignupFormValues) {
     setError(null);
     try {
-      await signup(data.email, data.fullName, data.password);
+      const isAdmin = data.role === "admin";
+      const userTier = isAdmin ? "basic" : data.tier;
+
+      await signup(
+        data.email,
+        data.fullName,
+        data.password,
+        isAdmin,
+        userTier as string
+      );
       toast.success("Account created successfully! Please login.");
     } catch (error: unknown) {
       console.error("Signup error:", error);
@@ -87,7 +123,7 @@ export default function SignupPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-lg">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">
             Create an account
@@ -164,6 +200,104 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
+
+              <div className="bg-muted/50 p-4 rounded-md">
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel>Select your role</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col space-y-2"
+                        >
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="admin" />
+                            </FormControl>
+                            <div className="space-y-1">
+                              <FormLabel className="font-medium">
+                                System Administrator
+                              </FormLabel>
+                              <FormDescription>
+                                Full administrative access to manage all users
+                              </FormDescription>
+                            </div>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="user" />
+                            </FormControl>
+                            <div className="space-y-1">
+                              <FormLabel className="font-medium">
+                                End-User
+                              </FormLabel>
+                              <FormDescription>
+                                Regular user who can use sentiment analysis
+                                features
+                              </FormDescription>
+                            </div>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {watchRole === "user" && (
+                <div className="bg-muted/50 p-4 rounded-md">
+                  <FormField
+                    control={form.control}
+                    name="tier"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel>Select your subscription tier</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            className="flex flex-col space-y-2"
+                          >
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="basic" />
+                              </FormControl>
+                              <div className="space-y-1">
+                                <FormLabel className="font-medium">
+                                  Basic
+                                </FormLabel>
+                                <FormDescription>
+                                  Default tier with essential features
+                                </FormDescription>
+                              </div>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="premium" />
+                              </FormControl>
+                              <div className="space-y-1">
+                                <FormLabel className="font-medium">
+                                  Premium
+                                </FormLabel>
+                                <FormDescription>
+                                  Advanced tier with additional features
+                                </FormDescription>
+                              </div>
+                            </FormItem>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Creating account..." : "Sign up"}
               </Button>

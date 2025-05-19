@@ -10,7 +10,13 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, fullName: string, password: string) => Promise<void>;
+  signup: (
+    email: string,
+    fullName: string,
+    password: string,
+    isAdmin: boolean,
+    userTier: string
+  ) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -77,10 +83,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Signup function
-  const signup = async (email: string, fullName: string, password: string) => {
+  const signup = async (
+    email: string,
+    fullName: string,
+    password: string,
+    isAdmin: boolean,
+    userTier: string
+  ) => {
     setIsLoading(true);
     try {
-      await authApi.signup({ email, fullName, password });
+      await authApi.signup({
+        email,
+        fullName,
+        password,
+        isAdmin,
+        userTier,
+      });
       router.push("/login");
     } catch (error) {
       console.error("Signup error:", error);

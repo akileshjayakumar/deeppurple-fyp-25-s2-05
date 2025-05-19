@@ -72,8 +72,16 @@ export const authApi = {
     email: string;
     fullName: string;
     password: string;
+    isAdmin: boolean;
+    userTier: string;
   }) => {
-    const response = await api.post("/auth/signup", userData);
+    const response = await api.post("/auth/signup", {
+      email: userData.email,
+      full_name: userData.fullName,
+      password: userData.password,
+      is_admin: userData.isAdmin,
+      user_tier: userData.userTier,
+    });
     return response.data;
   },
 
@@ -144,6 +152,11 @@ export const sessionApi = {
       params: { format },
       responseType: "blob",
     });
+    return response.data;
+  },
+
+  getSessionMessages: async (sessionId: string) => {
+    const response = await api.get(`/sessions/${sessionId}/messages`);
     return response.data;
   },
 };
@@ -371,6 +384,11 @@ export const userApi = {
     newPassword: string;
   }) => {
     const response = await api.post("/users/change-password", data);
+    return response.data;
+  },
+
+  deleteAccount: async () => {
+    const response = await api.delete("/users/profile");
     return response.data;
   },
 };

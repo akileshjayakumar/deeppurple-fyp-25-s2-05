@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { sessionApi, fileApi, analysisApi } from "@/lib/api";
 import { SessionWithInsights, FileInfo } from "@/types";
@@ -47,33 +47,91 @@ export default function SessionDetailPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch session details
-  useEffect(() => {
-    const fetchSession = async () => {
-      setIsLoading(true);
-      setError(null);
+  // Fetch session details and message history
+  const fetchSessionData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const sessionData = await sessionApi.getSessionById(sessionId);
+      setSession(sessionData);
+
+      // Get previous chat history
+      await fetchMessageHistory();
+
+      // Get files
       try {
-        const sessionData = await sessionApi.getSessionById(sessionId);
-        setSession(sessionData);
-
-        try {
-          const fileList = await fileApi.getFiles(sessionId);
-          setFiles(fileList.files || fileList);
-        } catch (fileErr) {
-          console.error("Failed to load files:", fileErr);
-          // Don't fail the whole page if just files fail to load
-          setFiles([]);
-        }
-      } catch (err) {
-        console.error("Failed to load session:", err);
-        setError("Failed to load session details");
-      } finally {
-        setIsLoading(false);
+        const fileList = await fileApi.getFiles(sessionId);
+        setFiles(fileList.files || fileList);
+      } catch (fileErr) {
+        console.error("Failed to load files:", fileErr);
+        // Don't fail the whole page if just files fail to load
+        setFiles([]);
       }
-    };
-
-    fetchSession();
+    } catch (err) {
+      console.error("Failed to load session:", err);
+      setError("Failed to load session details");
+    } finally {
+      setIsLoading(false);
+    }
   }, [sessionId]);
+
+  // Separate function to fetch message history
+  const fetchMessageHistory = async () => {
+    try {
+      const messageHistory = await sessionApi.getSessionMessages(sessionId);
+      if (messageHistory && messageHistory.length > 0) {
+        // Initialize with the welcome message
+        const formattedMessages: Message[] = [
+          {
+            id: "system-welcome",
+            content:
+              "Welcome! How can I help you with your sentiment analysis today?",
+            role: "system",
+            timestamp: new Date(),
+          },
+        ];
+
+        // Process each message in the history
+        messageHistory.forEach((msg: any) => {
+          // Add user message (question)
+          formattedMessages.push({
+            id: `user-${msg.id}`,
+            content: msg.question_text,
+            role: "user",
+            timestamp: new Date(msg.created_at),
+          });
+
+          // Add AI response if it exists
+          if (msg.answer_text) {
+            formattedMessages.push({
+              id: `assistant-${msg.id}`,
+              content: msg.answer_text,
+              role: "assistant",
+              timestamp: msg.answered_at
+                ? new Date(msg.answered_at)
+                : new Date(msg.created_at),
+            });
+          }
+        });
+
+        setMessages(formattedMessages);
+        console.log(
+          "Loaded message history:",
+          formattedMessages.length,
+          "messages"
+        );
+        return true;
+      }
+      return false;
+    } catch (msgErr) {
+      console.error("Failed to load message history:", msgErr);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    fetchSessionData();
+  }, [fetchSessionData]);
 
   // Scroll to bottom of messages when new messages are added
   useEffect(() => {
@@ -96,8 +154,9 @@ export default function SessionDetailPage() {
     }
 
     // Add user message to chat
+    const userMessageId = Date.now().toString();
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: userMessageId,
       content: selectedFile
         ? `[File: ${selectedFile.name}] ${question}`
         : question,
@@ -157,6 +216,7 @@ export default function SessionDetailPage() {
           console.error("Error refreshing file list:", error);
         }
       } else {
+        console.log("Streaming question to server:", currentQuestion);
         // Use streaming API for plain questions
         await analysisApi.streamQuestion(
           sessionId,
@@ -172,6 +232,7 @@ export default function SessionDetailPage() {
             );
           }
         );
+        console.log("Streaming completed, message saved to database");
       }
     } catch (error) {
       console.error("Error processing question:", error);
@@ -247,7 +308,21 @@ export default function SessionDetailPage() {
         <div className="col-span-2">
           <Card className="h-[70vh] flex flex-col">
             <CardHeader>
-              <CardTitle>Conversation</CardTitle>
+              <CardTitle className="flex justify-between items-center">
+                <span>Conversation</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fetchMessageHistory()}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Refresh"
+                  )}
+                </Button>
+              </CardTitle>
               <CardDescription>
                 Ask questions and analyze text in this session
               </CardDescription>

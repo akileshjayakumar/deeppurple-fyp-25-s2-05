@@ -6,6 +6,7 @@ export interface User {
   profile_picture?: string;
   is_active: boolean;
   is_admin: boolean;
+  user_tier: string;
   created_at: string;
 }
 
@@ -16,6 +17,7 @@ export interface UserResponse {
   profile_picture?: string;
   is_active: boolean;
   is_admin: boolean;
+  user_tier: string;
 }
 
 export interface AuthResponse {
