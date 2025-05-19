@@ -3,7 +3,15 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, LogOut, MessageSquare, User, Menu, X } from "lucide-react";
+import {
+  Home,
+  LogOut,
+  MessageSquare,
+  User,
+  Menu,
+  X,
+  ShieldAlert,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -57,6 +65,7 @@ export default function DashboardLayout({
     { icon: <Home size={18} />, label: "Dashboard", href: "/dashboard" },
     { icon: <MessageSquare size={18} />, label: "Sessions", href: "/sessions" },
     { icon: <User size={18} />, label: "Profile", href: "/profile" },
+    { icon: <ShieldAlert size={18} />, label: "Admin", href: "/admin" },
   ];
 
   // Generate user's initials for avatar fallback

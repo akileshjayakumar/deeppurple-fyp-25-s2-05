@@ -396,20 +396,34 @@ export const userApi = {
 // Admin APIs
 export const adminApi = {
   getUsers: async () => {
+    console.log("Fetching users from admin API");
     const response = await api.get("/admin/users");
+    console.log("Admin API Response:", response.data);
     return response.data;
   },
 
   updateUser: async (
     userId: string,
-    data: { fullName?: string; isActive?: boolean }
+    data: { fullName?: string; isActive?: boolean; isAdmin?: boolean }
   ) => {
-    const response = await api.patch(`/admin/users/${userId}`, data);
+    console.log("Updating user:", userId, data);
+    const response = await api.put(`/admin/users/${userId}`, {
+      full_name: data.fullName,
+      is_active: data.isActive,
+      is_admin: data.isAdmin,
+    });
     return response.data;
   },
 
   deactivateUser: async (userId: string) => {
-    const response = await api.post(`/admin/users/${userId}/deactivate`);
+    console.log("Deactivating user:", userId);
+    const response = await api.put(`/admin/users/${userId}/deactivate`);
+    return response.data;
+  },
+
+  activateUser: async (userId: string) => {
+    console.log("Activating user:", userId);
+    const response = await api.put(`/admin/users/${userId}/activate`);
     return response.data;
   },
 };

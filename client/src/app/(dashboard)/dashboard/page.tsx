@@ -68,6 +68,11 @@ export default function Dashboard() {
           <p className="text-muted-foreground">
             Welcome to DeepPurple. Analyze sentiment and emotions in your text.
           </p>
+          <div className="mt-2">
+            <Button variant="link" asChild>
+              <Link href="/admin">Admin Panel</Link>
+            </Button>
+          </div>
         </div>
 
         <div className="flex gap-2">
