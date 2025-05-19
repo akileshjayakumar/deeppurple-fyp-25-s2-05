@@ -150,3 +150,103 @@ async def delete_user_account(
     db.commit()
 
     return None
+
+
+@router.patch("/profile", response_model=schemas.UserResponse)
+async def update_user_profile_patch(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+    full_name: str = None,
+    profile_picture: UploadFile = None
+):
+    """
+    Update user profile information via PATCH method.
+
+    This endpoint allows updating profile information by sending form data,
+    supporting partial updates of profile details and file uploads.
+    """
+    # Get user from database
+    user = db.query(User).filter(User.id == current_user.id).first()
+
+    # Update full name if provided
+    if full_name:
+        user.full_name = full_name
+
+    # Update profile picture if provided
+    if profile_picture:
+        try:
+            # Read a small portion of the file to determine its MIME type
+            file_header = await profile_picture.read(2048)
+            mime_type = magic.from_buffer(file_header, mime=True)
+
+            # Reset file position after reading the header
+            await profile_picture.seek(0)
+
+            # Check if file type is an image
+            if not mime_type.startswith('image/'):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Uploaded file must be an image (JPEG, PNG, etc.)"
+                )
+
+            # Generate a unique filename to prevent collisions
+            file_extension = profile_picture.filename.split('.')[-1]
+            unique_filename = f"{uuid.uuid4()}.{file_extension}"
+
+            # Create a specific path for profile pictures
+            s3_key = f"profile_pictures/{current_user.id}/{unique_filename}"
+            profile_picture.filename = s3_key
+
+            # Upload profile picture to S3
+            s3_key = upload_file_to_s3(profile_picture, current_user.id)
+
+            # Update the user's profile picture URL
+            user.profile_picture = s3_key
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload profile picture: {str(e)}"
+            )
+
+    # Save changes
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+@router.delete("/profile", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user_account(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete the current user's account.
+
+    This endpoint allows users to delete their own account.
+    All associated data will be removed from the system.
+    """
+    # Get user from database
+    user = db.query(User).filter(User.id == current_user.id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # If the user is an admin, check if they are the last admin
+    if user.is_admin:
+        admin_count = db.query(User).filter(User.is_admin == True).count()
+        if admin_count <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete the last admin account"
+            )
+
+    # Delete the user
+    db.delete(user)
+    db.commit()
+
+    return None

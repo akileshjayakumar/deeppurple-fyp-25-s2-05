@@ -108,7 +108,7 @@ async def get_session(
     return session
 
 
-@router.put("/{session_id}", response_model=schemas.SessionResponse)
+@router.patch("/{session_id}", response_model=schemas.SessionResponse)
 async def update_session(
     session_id: int,
     session_update: schemas.SessionUpdate,
@@ -775,3 +775,38 @@ def export_csv(session, insights, questions, files):
         headers={
             "Content-Disposition": f"attachment; filename=session_report_{session.id}.csv"}
     )
+
+
+@router.get("/{session_id}/messages", response_model=List[schemas.SessionMessage])
+async def list_session_messages(
+    session_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    List messages (questions and answers) in a session.
+
+    This endpoint returns a chronological list of messages in a session,
+    including both questions asked by the user and answers provided by the system.
+    """
+    # Verify session belongs to user
+    session = db.query(SessionModel).filter(
+        SessionModel.id == session_id,
+        SessionModel.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+
+    # Get questions and answers for session
+    messages = db.query(Question).filter(
+        Question.session_id == session_id
+    ).order_by(Question.created_at.asc()).offset(skip).limit(limit).all()
+
+    # Format the messages as question-answer pairs
+    return messages

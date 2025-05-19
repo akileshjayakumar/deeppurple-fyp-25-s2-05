@@ -6,6 +6,12 @@ from typing import List, Dict, Optional, Any, Union
 # User schemas
 
 
+class UserTier(str, Enum):
+    """User subscription tier options"""
+    BASIC = "basic"
+    PREMIUM = "premium"
+
+
 class UserBase(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
@@ -14,12 +20,15 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    is_admin: bool = False
+    user_tier: Optional[UserTier] = UserTier.BASIC
 
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     profile_picture: Optional[str] = None
     password: Optional[str] = None
+    user_tier: Optional[UserTier] = None
 
 
 class PasswordUpdate(BaseModel):
@@ -31,6 +40,7 @@ class UserResponse(UserBase):
     id: int
     is_active: bool
     is_admin: bool
+    user_tier: UserTier
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -43,6 +53,7 @@ class UserListItem(UserBase):
     id: int
     is_active: bool
     is_admin: bool
+    user_tier: UserTier
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -112,6 +123,22 @@ class SessionResponse(SessionBase):
 class SessionListResponse(BaseModel):
     sessions: List[SessionResponse]
     total_count: int
+
+
+class SessionMessage(BaseModel):
+    """
+    Schema for retrieving message history from a session.
+    Matches the fields in the database Question model structure.
+    """
+    id: int
+    session_id: int
+    question_text: str
+    answer_text: Optional[str] = None
+    created_at: datetime
+    answered_at: Optional[datetime] = None
+
+    class Config:
+        orm_mode = True  # For compatibility with SQLAlchemy models
 
 # File schemas
 

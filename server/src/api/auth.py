@@ -66,6 +66,7 @@ async def signup(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
 
     This endpoint allows new users to register with an email and password. It checks if
     the email is already in use, hashes the password, and creates a new user in the database.
+    Additionally, it supports role selection (admin/non-admin) and subscription tier selection.
     """
     # Check if email already exists
     existing_user = db.query(User).filter(
@@ -83,13 +84,21 @@ async def signup(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Password is required"
         )
 
-    # Create new user
+    # Create new user with base fields
     new_user = User(
         email=user_data.email,
         full_name=user_data.full_name,
         profile_picture=user_data.profile_picture,
-        hashed_password=get_password_hash(user_data.password)
+        hashed_password=get_password_hash(user_data.password),
+        is_admin=user_data.is_admin
     )
+
+    # Try to set user_tier if the column exists
+    try:
+        new_user.user_tier = user_data.user_tier
+    except Exception as e:
+        logger.warning(
+            f"Failed to set user_tier: {str(e)}. This may be normal if the column doesn't exist yet.")
 
     # Add user to database
     db.add(new_user)

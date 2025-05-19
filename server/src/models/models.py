@@ -21,6 +21,7 @@ class User(Base):
         profile_picture: URL or path to user's profile picture
         is_active: Account status flag (active/inactive)
         is_admin: Admin status flag (admin privileges)
+        user_tier: User's subscription tier (basic or premium)
         created_at: Timestamp when the account was created
         updated_at: Timestamp when the account was last updated
 
@@ -36,6 +37,7 @@ class User(Base):
     profile_picture = Column(String(512), nullable=True)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    user_tier = Column(String(50), default="basic", nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
