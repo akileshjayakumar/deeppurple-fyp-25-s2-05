@@ -10,10 +10,6 @@ DeepPurple is a text analysis software that automates the process of analyzing c
   - [Docker Setup](#docker-setup)
   - [Manual Setup](#manual-setup)
 - [Development](#development)
-- [Testing](#testing)
-- [Troubleshooting](#troubleshooting)
-- [API Documentation](#api-documentation)
-- [Contributing](#contributing)
 
 ## Prerequisites
 
@@ -85,13 +81,13 @@ Once the containers are running, you can access:
 3. **Stop the application**
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 To also remove the database volume:
 
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 ### Manual Setup
