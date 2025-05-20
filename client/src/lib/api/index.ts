@@ -152,6 +152,8 @@ export const sessionApi = {
       params: { format },
       responseType: "blob",
     });
+
+    // Return the blob directly
     return response.data;
   },
 
