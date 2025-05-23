@@ -6,6 +6,7 @@ This module provides functions for interacting with AWS S3 storage.
 
 import os
 import boto3
+import asyncio
 from botocore.exceptions import ClientError
 from fastapi import UploadFile, HTTPException
 import logging
@@ -18,64 +19,67 @@ from core.config import settings
 # Set up logging
 logger = logging.getLogger(__name__)
 
+# Global S3 client for reuse
+_s3_client = None
+
 
 def get_s3_client():
     """
     Create and return an S3 client using the configured AWS credentials.
-    If AWS_S3_USE_LOCAL is set, connects to a local MinIO service instead.
+    Uses a global client for better performance.
 
     Returns:
         boto3.client: A configured S3 client
     """
-    try:
-        # Get AWS credentials from settings
-        aws_access_key_id = settings.AWS_ACCESS_KEY_ID
-        aws_secret_access_key = settings.AWS_SECRET_ACCESS_KEY
-        region_name = settings.AWS_REGION
+    global _s3_client
 
-        # Check if we should use local MinIO
-        use_local = getattr(settings, 'AWS_S3_USE_LOCAL', False)
-        endpoint_url = getattr(settings, 'AWS_ENDPOINT_URL', None)
+    if _s3_client is not None:
+        return _s3_client
+
+    try:
+        # Validate required AWS credentials
+        if not settings.AWS_ACCESS_KEY_ID or not settings.AWS_SECRET_ACCESS_KEY:
+            raise HTTPException(
+                status_code=500,
+                detail="AWS credentials not configured"
+            )
 
         # Configure client parameters
         client_kwargs = {
             'service_name': 's3',
-            'aws_access_key_id': aws_access_key_id,
-            'aws_secret_access_key': aws_secret_access_key,
-            'region_name': region_name
+            'aws_access_key_id': settings.AWS_ACCESS_KEY_ID,
+            'aws_secret_access_key': settings.AWS_SECRET_ACCESS_KEY,
+            'region_name': settings.AWS_REGION
         }
 
-        # Add endpoint_url for MinIO if using local S3
-        if use_local and endpoint_url:
-            client_kwargs['endpoint_url'] = endpoint_url
-            # For MinIO we often need to disable these checks
+        # Add endpoint_url for MinIO if using local S3 (for testing)
+        if settings.AWS_ENDPOINT_URL:
+            client_kwargs['endpoint_url'] = settings.AWS_ENDPOINT_URL
             client_kwargs['verify'] = False
 
-        return boto3.client(**client_kwargs)
+        _s3_client = boto3.client(**client_kwargs)
+        return _s3_client
     except Exception as e:
         logger.error(f"Failed to create S3 client: {str(e)}")
         raise HTTPException(
             status_code=500, detail="Failed to connect to S3 storage")
 
 
-def upload_file_to_s3(
-    file: Union[UploadFile, BinaryIO],
+async def upload_file_to_s3(
+    file: Union[UploadFile, BinaryIO, bytes],
     session_id: int = None,
     filename: Optional[str] = None
 ) -> str:
     """
-    Upload a file to S3 storage or simulate it in development mode.
-
-    In production, this would upload to an actual S3 bucket.
-    In development, it saves to a local 'uploads' directory.
+    Upload a file to S3 storage.
 
     Args:
-        file: File object to upload (UploadFile or BytesIO)
+        file: File object to upload (UploadFile, BytesIO, or bytes)
         session_id: Optional session ID
         filename: Optional filename to use (if file is not UploadFile)
 
     Returns:
-        String containing the S3 key or local file path
+        String containing the S3 key
     """
     try:
         # Create a unique filename
@@ -92,60 +96,21 @@ def upload_file_to_s3(
         unique_id = str(uuid.uuid4())
         s3_key = f"{session_id if session_id else 'general'}/{unique_id}_{original_filename}"
 
-        # In development mode, save to local filesystem
-        if not os.getenv("AWS_ACCESS_KEY_ID") or settings.AWS_S3_USE_LOCAL:
-            logger.info(
-                f"Running in development mode, saving to local file: {s3_key}")
-
-            # Create uploads directory if it doesn't exist
-            uploads_dir = os.path.join(os.getcwd(), 'uploads')
-            if not os.path.exists(uploads_dir):
-                os.makedirs(uploads_dir, exist_ok=True)
-
-            # Create session directory if needed
-            session_dir = os.path.join(uploads_dir, str(
-                session_id if session_id else 'general'))
-            if not os.path.exists(session_dir):
-                os.makedirs(session_dir, exist_ok=True)
-
-            # Define the file path
-            file_path = os.path.join(uploads_dir, s3_key)
-
-            # Ensure directory exists (for nested paths)
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-            # Read the file data
-            if isinstance(file, UploadFile):
-                # For FastAPI UploadFile, we need to get the file data
-                file_content = file.file.read()
-                # Reset file position for future reads
-                file.file.seek(0)
-            else:
-                # For regular file objects like BytesIO
-                if hasattr(file, 'tell') and hasattr(file, 'seek'):
-                    current_pos = file.tell()
-                    file_content = file.read()
-                    file.seek(current_pos)  # Reset position
-                else:
-                    # Handle raw bytes
-                    file_content = file if isinstance(
-                        file, bytes) else file.read()
-
-            # Write to disk
-            with open(file_path, 'wb') as f:
-                f.write(file_content)
-
-            logger.info(f"File saved to {file_path}")
-            return s3_key
-
-        # In production, use boto3 to upload to AWS S3
+        # Use boto3 to upload to AWS S3
         s3_client = get_s3_client()
-        bucket_name = settings.AWS_BUCKET_NAME
+        bucket_name = settings.AWS_S3_BUCKET_NAME
 
-        # Read the file content
-        if isinstance(file, UploadFile):
-            file_content = file.file.read()
-            file.file.seek(0)  # Reset position
+        logger.info(
+            f"Uploading file to S3 bucket: {bucket_name}, key: {s3_key}")
+
+        # Read the file content based on the input type
+        if isinstance(file, bytes):
+            # Already have bytes
+            file_content = file
+        elif isinstance(file, UploadFile):
+            file_content = await file.read()
+            # Reset file position for future reads
+            await file.seek(0)
         else:
             # For regular file objects like BytesIO
             if hasattr(file, 'tell') and hasattr(file, 'seek'):
@@ -156,11 +121,15 @@ def upload_file_to_s3(
                 # Handle raw bytes
                 file_content = file if isinstance(file, bytes) else file.read()
 
-        # Upload to S3
-        s3_client.put_object(
-            Bucket=bucket_name,
-            Key=s3_key,
-            Body=file_content
+        # Upload to S3 using a thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: s3_client.put_object(
+                Bucket=bucket_name,
+                Key=s3_key,
+                Body=file_content
+            )
         )
 
         logger.info(f"File uploaded to S3: {s3_key}")
@@ -171,9 +140,9 @@ def upload_file_to_s3(
         raise
 
 
-def get_file_from_s3(s3_key: str) -> bytes:
+async def get_file_from_s3(s3_key: str) -> bytes:
     """
-    Retrieve a file from S3 storage or local file system in development mode.
+    Retrieve a file from S3 storage.
 
     Args:
         s3_key: The key (path) of the file in S3
@@ -182,48 +151,44 @@ def get_file_from_s3(s3_key: str) -> bytes:
         Bytes containing the file data
     """
     try:
-        # In development mode, read from local filesystem
-        if not os.getenv("AWS_ACCESS_KEY_ID") or settings.AWS_S3_USE_LOCAL:
-            logger.info(
-                f"Running in development mode, reading local file: {s3_key}")
-            file_path = os.path.join(os.getcwd(), 'uploads', s3_key)
+        s3_client = get_s3_client()
+        bucket_name = settings.AWS_S3_BUCKET_NAME
 
-            if not os.path.exists(file_path):
-                logger.error(f"File not found at {file_path}")
-                return b""
+        logger.info(f"Retrieving file from S3: {s3_key}")
 
-            with open(file_path, 'rb') as f:
-                file_content = f.read()
-                logger.debug(
-                    f"Read {len(file_content)} bytes from local file: {s3_key}")
-                return file_content
-
-        # In production, use boto3 to get from AWS S3
-        try:
-            s3_client = get_s3_client()
-            bucket_name = settings.AWS_BUCKET_NAME
-
-            response = s3_client.get_object(
+        # Use thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: s3_client.get_object(
                 Bucket=bucket_name,
                 Key=s3_key
             )
+        )
 
-            file_content = response['Body'].read()
-            logger.debug(f"Read {len(file_content)} bytes from S3: {s3_key}")
-            return file_content
+        # Read the response body
+        body = response['Body']
+        file_content = await loop.run_in_executor(None, body.read)
+        body.close()
 
-        except ClientError as e:
+        logger.debug(f"Read {len(file_content)} bytes from S3: {s3_key}")
+        return file_content
+
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code == 'NoSuchKey':
+            logger.error(f"File not found in S3: {s3_key}")
+        else:
             logger.error(f"S3 client error: {str(e)}")
-            return b""
-
+        return b""
     except Exception as e:
         logger.error(f"Error in get_file_from_s3: {str(e)}")
         return b""
 
 
-def delete_file_from_s3(s3_key: str) -> bool:
+async def delete_file_from_s3(s3_key: str) -> bool:
     """
-    Delete a file from S3 storage or local file system in development mode.
+    Delete a file from S3 storage.
 
     Args:
         s3_key: The key (path) of the file in S3
@@ -232,29 +197,33 @@ def delete_file_from_s3(s3_key: str) -> bool:
         Boolean indicating success or failure
     """
     try:
-        # In development mode, delete from local filesystem
-        if not os.getenv("AWS_ACCESS_KEY_ID"):
-            logger.info(
-                f"Running in development mode, deleting local file: {s3_key}")
-            file_path = os.path.join(os.getcwd(), 'uploads', s3_key)
+        s3_client = get_s3_client()
+        bucket_name = settings.AWS_S3_BUCKET_NAME
 
-            if not os.path.exists(file_path):
-                logger.warning(f"File not found for deletion: {file_path}")
-                return False
+        logger.info(f"Deleting file from S3: {s3_key}")
 
-            os.remove(file_path)
-            return True
+        # Use thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: s3_client.delete_object(
+                Bucket=bucket_name,
+                Key=s3_key
+            )
+        )
 
-        # In production, this would use boto3 to delete from AWS S3
-        logger.warning("S3 deletion not implemented in production mode")
+        logger.info(f"File deleted from S3: {s3_key}")
         return True
 
+    except ClientError as e:
+        logger.error(f"S3 client error during deletion: {str(e)}")
+        return False
     except Exception as e:
         logger.error(f"Error in delete_file_from_s3: {str(e)}")
         return False
 
 
-def generate_presigned_url(s3_key: str, expiration: int = 3600) -> str:
+async def generate_presigned_url(s3_key: str, expiration: int = 3600) -> str:
     """
     Generate a presigned URL for accessing a file in S3.
 
@@ -265,20 +234,29 @@ def generate_presigned_url(s3_key: str, expiration: int = 3600) -> str:
     Returns:
         String containing the presigned URL
     """
-    # In development mode, return a local URL
-    if not os.getenv("AWS_ACCESS_KEY_ID"):
-        logger.info(
-            f"Running in development mode, generating local URL for: {s3_key}")
-        file_path = os.path.join(os.getcwd(), 'uploads', s3_key)
+    try:
+        s3_client = get_s3_client()
+        bucket_name = settings.AWS_S3_BUCKET_NAME
 
-        if not os.path.exists(file_path):
-            logger.warning(f"File not found for URL generation: {file_path}")
-            return ""
+        logger.info(f"Generating presigned URL for S3 file: {s3_key}")
 
-        # Return a file:// URL
-        return f"file://{os.path.abspath(file_path)}"
+        # Use thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        presigned_url = await loop.run_in_executor(
+            None,
+            lambda: s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': bucket_name, 'Key': s3_key},
+                ExpiresIn=expiration
+            )
+        )
 
-    # In production, this would use boto3 to generate a presigned URL
-    logger.warning(
-        "S3 presigned URL generation not implemented in production mode")
-    return f"http://example.com/s3/{s3_key}"
+        logger.debug(f"Generated presigned URL: {presigned_url}")
+        return presigned_url
+
+    except ClientError as e:
+        logger.error(f"S3 client error during URL generation: {str(e)}")
+        return ""
+    except Exception as e:
+        logger.error(f"Error in generate_presigned_url: {str(e)}")
+        return ""
