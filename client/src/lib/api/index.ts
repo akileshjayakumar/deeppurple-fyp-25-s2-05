@@ -385,7 +385,10 @@ export const userApi = {
     currentPassword: string;
     newPassword: string;
   }) => {
-    const response = await api.post("/users/change-password", data);
+    const response = await api.post("/users/change-password", {
+      current_password: data.currentPassword,
+      new_password: data.newPassword,
+    });
     return response.data;
   },
 

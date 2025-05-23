@@ -38,19 +38,15 @@ async def lifespan(app: FastAPI):
         logger.debug(
             f"Attempting to connect to database with URL: {SQLALCHEMY_DATABASE_URL}")
 
-        # Create database tables - skip in Lambda environment
-        if not settings.IS_LAMBDA:
-            Base.metadata.create_all(bind=engine)
-            logger.debug("Database tables created successfully")
-        else:
-            logger.debug(
-                "Running in Lambda environment - skipping database table creation")
+        # Create database tables
+        Base.metadata.create_all(bind=engine)
+        logger.debug("Database tables created successfully")
 
-        # Create initial admin user if environment variables are set and not in Lambda
+        # Create initial admin user if environment variables are set
         admin_email = os.getenv("ADMIN_EMAIL")
         admin_password = os.getenv("ADMIN_PASSWORD")
 
-        if admin_email and admin_password and not settings.IS_LAMBDA:
+        if admin_email and admin_password:
             # Get a database session
             from sqlalchemy.orm import sessionmaker
             SessionLocal = sessionmaker(
@@ -71,7 +67,7 @@ async def lifespan(app: FastAPI):
                 db.close()
         else:
             logger.info(
-                "Admin credentials not provided or running in Lambda, skipping admin user creation")
+                "Admin credentials not provided, skipping admin user creation")
 
         # Always create a test user for development, whether admin is created or not
         try:
@@ -109,7 +105,7 @@ async def lifespan(app: FastAPI):
     # Clean up resources at shutdown if needed
     pass
 
-# Initialize FastAPI app with appropriate configuration for Lambda/Beanstalk
+# Initialize FastAPI app with appropriate configuration for Elastic Beanstalk
 root_path = "" if not settings.API_BASE_URL else settings.API_BASE_URL
 
 app = FastAPI(
@@ -208,7 +204,7 @@ async def root():
     """
     env_info = {
         "environment": settings.DEPLOYMENT_ENV,
-        "is_lambda": settings.IS_LAMBDA
+        "deployment_target": "elastic_beanstalk"
     }
 
     return {
@@ -244,7 +240,7 @@ async def health_check():
         "status": "ok",
         "database": db_status,
         "deployment_env": settings.DEPLOYMENT_ENV,
-        "is_lambda": settings.IS_LAMBDA
+        "deployment_target": "elastic_beanstalk"
     }
 
 if __name__ == "__main__":
