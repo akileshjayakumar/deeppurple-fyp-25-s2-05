@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -23,8 +24,11 @@ import {
   FileText,
   ChevronDown,
   FileDown,
+  Paperclip,
+  BarChart,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Message {
   id: string;
@@ -56,6 +60,9 @@ export default function SessionDetailPage() {
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<"chat" | "files" | "insights">(
+    "chat"
+  );
 
   // Function to check if there's at least one AI response
   const hasAIResponses = useCallback(() => {
@@ -296,7 +303,7 @@ export default function SessionDetailPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
       </div>
     );
   }
@@ -369,258 +376,438 @@ export default function SessionDetailPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-lg shadow-sm border">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{session.name}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{session.name}</h1>
           <p className="text-muted-foreground">
             Created on {new Date(session.created_at).toLocaleDateString()}
           </p>
         </div>
-        <div className="relative" ref={exportDropdownRef}>
-          <Button
-            variant="outline"
-            className="flex items-center gap-2"
-            onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-            disabled={!hasAIResponses()}
-            title={
-              !hasAIResponses()
-                ? "Ask a question first to enable export"
-                : "Export this session"
-            }
-          >
-            <FileDown className="h-4 w-4" />
-            Export Report
-            <ChevronDown className="h-4 w-4 opacity-50" />
-          </Button>
-          {isExportDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-52 bg-background border rounded-md shadow-lg overflow-hidden z-10">
-              <div className="py-1">
-                <button
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
-                  onClick={() => handleExportReport("markdown")}
-                >
-                  <span className="w-5 text-center">📝</span>
-                  <span>Markdown (.md)</span>
-                </button>
-                <button
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
-                  onClick={() => handleExportReport("pdf")}
-                >
-                  <span className="w-5 text-center">📄</span>
-                  <span>PDF Document (.pdf)</span>
-                </button>
-                <button
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-muted flex items-center gap-2"
-                  onClick={() => handleExportReport("csv")}
-                >
-                  <span className="w-5 text-center">📊</span>
-                  <span>CSV Spreadsheet (.csv)</span>
-                </button>
+        <div className="flex gap-2">
+          <div className="relative" ref={exportDropdownRef}>
+            <Button
+              variant="outline"
+              className="flex items-center gap-2"
+              onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+              disabled={!hasAIResponses()}
+              title={
+                !hasAIResponses()
+                  ? "Ask a question first to enable export"
+                  : "Export this session"
+              }
+            >
+              <FileDown className="h-4 w-4" />
+              Export
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+            {isExportDropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-52 bg-white border rounded-md shadow-lg overflow-hidden z-10">
+                <div className="py-1">
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2"
+                    onClick={() => handleExportReport("markdown")}
+                  >
+                    <span className="w-5 text-center">📝</span>
+                    <span>Markdown (.md)</span>
+                  </button>
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2"
+                    onClick={() => handleExportReport("pdf")}
+                  >
+                    <span className="w-5 text-center">📄</span>
+                    <span>PDF Document (.pdf)</span>
+                  </button>
+                  <button
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2"
+                    onClick={() => handleExportReport("csv")}
+                  >
+                    <span className="w-5 text-center">📊</span>
+                    <span>CSV Spreadsheet (.csv)</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Main chat area */}
-        <div className="col-span-2">
-          <Card className="h-[70vh] flex flex-col">
-            <CardHeader>
-              <CardTitle className="flex justify-between items-center">
-                <span>Conversation</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fetchMessageHistory()}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Refresh"
-                  )}
-                </Button>
-              </CardTitle>
-              <CardDescription>
-                Ask questions and analyze text in this session
-              </CardDescription>
-            </CardHeader>
+      <Tabs
+        defaultValue="chat"
+        className="w-full"
+        onValueChange={(value) =>
+          setActiveTab(value as "chat" | "files" | "insights")
+        }
+      >
+        <TabsList className="grid grid-cols-3 mb-4">
+          <TabsTrigger
+            value="chat"
+            className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-800"
+          >
+            Chat
+          </TabsTrigger>
+          <TabsTrigger
+            value="files"
+            className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-800"
+          >
+            Files ({files.length})
+          </TabsTrigger>
+          <TabsTrigger
+            value="insights"
+            className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-800"
+          >
+            Insights
+          </TabsTrigger>
+        </TabsList>
 
-            {/* Messages area with scroll */}
-            <CardContent className="flex-grow overflow-auto border-y">
-              <div className="space-y-4 min-h-full">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex gap-3 ${
-                      message.role === "user" ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    {message.role !== "user" && (
-                      <Avatar
-                        className={
-                          message.role === "assistant"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground"
-                        }
-                      >
-                        <AvatarFallback>
-                          {message.role === "assistant" ? "AI" : "SYS"}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-
-                    <div
-                      className={`rounded-lg p-3 max-w-[80%] ${
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : message.role === "assistant"
-                          ? "bg-card border"
-                          : "bg-muted text-muted-foreground text-sm"
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap">
-                        {message.content}
-                      </div>
-                      <div className="text-xs opacity-70 mt-1 text-right">
-                        {message.timestamp.toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </div>
-                    </div>
-
-                    {message.role === "user" && (
-                      <Avatar>
-                        <AvatarFallback>U</AvatarFallback>
-                      </Avatar>
-                    )}
-                  </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-            </CardContent>
-
-            {/* Input area */}
-            <CardFooter className="p-4">
-              <form
-                onSubmit={handleAskQuestion}
-                className="w-full flex flex-col gap-2"
-              >
-                {/* File attachment UI similar to ChatGPT */}
-                {selectedFile && (
-                  <div className="flex items-center gap-2 p-2 border border-input rounded-md bg-muted/50">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm truncate flex-1">
-                      {selectedFile.name}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => setSelectedFile(null)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-
-                <div className="flex items-center w-full gap-2">
-                  <Input
-                    placeholder={
-                      selectedFile
-                        ? "Ask a question about this file..."
-                        : "Ask a question or enter text to analyze..."
-                    }
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    disabled={isAskingQuestion}
-                    className="flex-1"
-                  />
+        <TabsContent value="chat" className="mt-0">
+          <div className="grid grid-cols-1 gap-6">
+            {/* Chat area */}
+            <Card className="h-[70vh] flex flex-col border shadow-sm">
+              <CardHeader className="bg-white border-b">
+                <CardTitle className="flex justify-between items-center">
+                  <span>Conversation</span>
                   <Button
-                    type="submit"
-                    disabled={
-                      isAskingQuestion || (!question.trim() && !selectedFile)
-                    }
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchMessageHistory()}
+                    disabled={isLoading}
                   >
-                    {isAskingQuestion ? (
+                    {isLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <SendIcon className="h-4 w-4" />
+                      "Refresh"
                     )}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isAskingQuestion}
-                  >
-                    <Upload className="h-4 w-4" />
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    onChange={handleFileSelect}
-                    accept=".txt,.csv,.pdf"
-                  />
-                </div>
-              </form>
-            </CardFooter>
-          </Card>
-        </div>
-
-        {/* Right side: Only insights, removed file list */}
-        <div className="space-y-6">
-          {/* Insights summary card */}
-          {session.insights && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Session Insights</CardTitle>
+                </CardTitle>
+                <CardDescription>
+                  Ask questions and analyze text in this session
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {session.insights.emotion_summary && (
-                  <div>
-                    <h4 className="text-sm font-medium">Dominant Emotion:</h4>
-                    <p className="text-primary font-bold capitalize">
-                      {session.insights.emotion_summary.dominant_emotion}
-                    </p>
-                  </div>
-                )}
 
-                {session.insights.sentiment_summary && (
-                  <div>
-                    <h4 className="text-sm font-medium">Overall Sentiment:</h4>
-                    <p className="capitalize font-bold">
-                      {session.insights.sentiment_summary.overall}
-                    </p>
-                  </div>
-                )}
+              {/* Messages area with scroll */}
+              <CardContent className="flex-grow overflow-auto border-y p-4">
+                <div className="space-y-4">
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`flex ${
+                        message.role === "user"
+                          ? "justify-end"
+                          : "justify-start"
+                      }`}
+                    >
+                      {message.role !== "user" && (
+                        <Avatar
+                          className={
+                            message.role === "assistant"
+                              ? "bg-purple-600"
+                              : "bg-gray-400"
+                          }
+                        >
+                          <AvatarFallback>
+                            {message.role === "assistant" ? "AI" : "SYS"}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
 
-                {session.insights.topics &&
-                  session.insights.topics.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium">Top Topics:</h4>
-                      <div className="flex flex-wrap gap-2 mt-1">
+                      <div
+                        className={`mx-2 rounded-lg p-4 max-w-[80%] ${
+                          message.role === "user"
+                            ? "bg-purple-600 text-white"
+                            : message.role === "assistant"
+                            ? "bg-white border"
+                            : "bg-gray-100"
+                        }`}
+                      >
+                        <div className="whitespace-pre-wrap">
+                          {message.content}
+                        </div>
+                        <div className="text-xs opacity-70 mt-2 text-right">
+                          {message.timestamp.toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      </div>
+
+                      {message.role === "user" && (
+                        <Avatar>
+                          <AvatarFallback>U</AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+              </CardContent>
+
+              {/* Input area */}
+              <CardFooter className="p-4 border-t bg-white">
+                <form onSubmit={handleAskQuestion} className="w-full">
+                  {selectedFile && (
+                    <div className="flex items-center gap-2 p-2 mb-2 border rounded-md bg-gray-50">
+                      <FileText className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm truncate flex-1">
+                        {selectedFile.name}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => setSelectedFile(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Textarea
+                      value={question}
+                      onChange={(e) => setQuestion(e.target.value)}
+                      placeholder={
+                        selectedFile
+                          ? "Ask a question about this file..."
+                          : "Ask a question..."
+                      }
+                      className="min-h-[60px] flex-1 resize-none"
+                      disabled={isAskingQuestion}
+                    />
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        type="submit"
+                        size="icon"
+                        disabled={
+                          isAskingQuestion ||
+                          (!question.trim() && !selectedFile)
+                        }
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        {isAskingQuestion ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <SendIcon className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isAskingQuestion}
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                        accept=".txt,.csv,.pdf,.docx"
+                      />
+                    </div>
+                  </div>
+                </form>
+              </CardFooter>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="files" className="mt-0">
+          <Card className="border shadow-sm">
+            <CardHeader className="bg-white border-b">
+              <CardTitle>Files</CardTitle>
+              <CardDescription>Files uploaded in this session</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4">
+              {files.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Paperclip className="mx-auto h-12 w-12 mb-2 opacity-20" />
+                  <p>No files uploaded yet</p>
+                  <p className="text-sm">
+                    Upload files by attaching them to your questions
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  {files.map((file) => (
+                    <div
+                      key={file.id}
+                      className="flex items-center justify-between p-3 border rounded-md hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-gray-500" />
+                        <div>
+                          <p className="font-medium">{file.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Uploaded{" "}
+                            {new Date(file.upload_date).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm">
+                        Download
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="insights" className="mt-0">
+          <Card className="border shadow-sm">
+            <CardHeader className="bg-white border-b">
+              <CardTitle>Insights</CardTitle>
+              <CardDescription>
+                Analysis insights from this session
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4">
+              {!session.insights ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <BarChart className="mx-auto h-12 w-12 mb-2 opacity-20" />
+                  <p>No insights available yet</p>
+                  <p className="text-sm">Ask questions to generate insights</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Sentiment Summary */}
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">
+                      Sentiment Analysis
+                    </h3>
+                    {session.insights.sentiment_summary ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-white p-4 rounded-lg border">
+                          <div className="text-sm text-muted-foreground mb-1">
+                            Overall
+                          </div>
+                          <div className="flex items-center">
+                            <span
+                              className={`px-2 py-1 text-xs font-medium rounded-full capitalize ${
+                                session.insights.sentiment_summary.overall ===
+                                "positive"
+                                  ? "bg-green-100 text-green-800"
+                                  : session.insights.sentiment_summary
+                                      .overall === "negative"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {session.insights.sentiment_summary.overall ||
+                                "Neutral"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg border">
+                          <div className="text-sm text-muted-foreground mb-1">
+                            Positive Score
+                          </div>
+                          <div className="font-medium">
+                            {session.insights.sentiment_summary.positive?.toFixed(
+                              2
+                            ) || "N/A"}
+                          </div>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg border">
+                          <div className="text-sm text-muted-foreground mb-1">
+                            Negative Score
+                          </div>
+                          <div className="font-medium">
+                            {session.insights.sentiment_summary.negative?.toFixed(
+                              2
+                            ) || "N/A"}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        No sentiment data available
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Emotion Summary */}
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">
+                      Emotion Analysis
+                    </h3>
+                    {session.insights.emotion_summary ? (
+                      <div>
+                        <div className="bg-white p-4 rounded-lg border mb-4">
+                          <div className="text-sm text-muted-foreground mb-1">
+                            Dominant Emotion
+                          </div>
+                          <div>
+                            {session.insights.emotion_summary
+                              .dominant_emotion && (
+                              <span
+                                className={`px-2 py-1 text-xs font-medium rounded-full capitalize ${
+                                  session.insights.emotion_summary
+                                    .dominant_emotion === "joy"
+                                    ? "bg-green-100 text-green-800"
+                                    : session.insights.emotion_summary
+                                        .dominant_emotion === "sadness"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : session.insights.emotion_summary
+                                        .dominant_emotion === "anger"
+                                    ? "bg-red-100 text-red-800"
+                                    : session.insights.emotion_summary
+                                        .dominant_emotion === "fear"
+                                    ? "bg-purple-100 text-purple-800"
+                                    : session.insights.emotion_summary
+                                        .dominant_emotion === "surprise"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {
+                                  session.insights.emotion_summary
+                                    .dominant_emotion
+                                }
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        No emotion data available
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Topics */}
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">Topics</h3>
+                    {session.insights.topics &&
+                    session.insights.topics.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
                         {session.insights.topics.map((topic) => (
                           <span
                             key={topic.id}
-                            className="bg-secondary text-xs px-2 py-1 rounded-full"
+                            className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm"
                           >
                             {topic.name}
                           </span>
                         ))}
                       </div>
-                    </div>
-                  )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        No topics identified
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
