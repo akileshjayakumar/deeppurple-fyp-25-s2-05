@@ -54,8 +54,7 @@ USER nextjs
 # Expose port
 EXPOSE 80
 
-ENV PORT 80
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=80
+ENV HOSTNAME=0.0.0.0
 
-# Start the application
-CMD ["node", "server.js"] 
+CMD ["node", "server.js"]
