@@ -42,62 +42,6 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         logger.debug("Database tables created successfully")
 
-        # Create initial admin user if environment variables are set
-        admin_email = os.getenv("ADMIN_EMAIL")
-        admin_password = os.getenv("ADMIN_PASSWORD")
-
-        if admin_email and admin_password:
-            # Get a database session
-            from sqlalchemy.orm import sessionmaker
-            SessionLocal = sessionmaker(
-                autocommit=False, autoflush=False, bind=engine)
-            db = SessionLocal()
-
-            try:
-                # Create admin user
-                admin_user = create_admin_user(
-                    db=db,
-                    email=admin_email,
-                    password=admin_password
-                )
-                logger.info(f"Admin user setup completed for {admin_email}")
-            except Exception as e:
-                logger.error(f"Failed to create admin user: {str(e)}")
-            finally:
-                db.close()
-        else:
-            logger.info(
-                "Admin credentials not provided, skipping admin user creation")
-
-        # Always create a test user for development, whether admin is created or not
-        try:
-            from sqlalchemy.orm import sessionmaker
-            SessionLocal = sessionmaker(
-                autocommit=False, autoflush=False, bind=engine)
-            db = SessionLocal()
-
-            from core.auth import get_password_hash
-            from models.models import User
-
-            test_user = db.query(User).filter(
-                User.email == "user@example.com").first()
-            if not test_user:
-                test_user = User(
-                    email="user@example.com",
-                    hashed_password=get_password_hash("password"),
-                    full_name="Test User",
-                    is_active=True
-                )
-                db.add(test_user)
-                db.commit()
-                logger.info("Test user created: user@example.com / password")
-            else:
-                logger.info("Test user already exists")
-
-            db.close()
-        except Exception as e:
-            logger.error(f"Failed to create test user: {str(e)}")
-
     except Exception as e:
         logger.error(f"Error during database initialization: {str(e)}")
 
