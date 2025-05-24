@@ -26,6 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
+import { GoogleLogin } from "@react-oauth/google";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -37,7 +38,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { login, isLoading } = useAuth();
+  const { login, googleLogin, isLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
@@ -71,6 +72,30 @@ export default function LoginPage() {
       toast.error(errorMessage);
     }
   }
+
+  async function onGoogleSubmit (credentialResponse: any) {
+    setError(null);
+    try {
+      await googleLogin(credentialResponse.credential);
+      toast.success("Google login successful!");
+    } catch (error: unknown) {
+      console.error("Google login error:", error);
+      const errorMessage =
+        error &&
+        typeof error === "object" &&
+        "response" in error &&
+        error.response &&
+        typeof error.response === "object" &&
+        "data" in error.response &&
+        error.response.data &&
+        typeof error.response.data === "object" &&
+        "detail" in error.response.data
+          ? String(error.response.data.detail)
+          : "Google login failed. Please try again.";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -126,6 +151,23 @@ export default function LoginPage() {
               </Button>
             </form>
           </Form>
+
+          {/* Google Login */}
+          <div className="flex items-center my-4">
+          <div className="flex-grow border-t border-gray-300"></div>
+          <span className="mx-2 text-muted-foreground text-xs">or</span>
+          <div className="flex-grow border-t border-gray-300"></div>
+          </div>
+
+          <GoogleLogin
+            onSuccess={onGoogleSubmit}
+            onError={() => {
+              console.log("Login Failed");
+              toast.error("Google login failed. Please try again.");
+            }}
+            containerProps={{ style: { width: "100%" } }}
+          />
+
         </CardContent>
         <CardFooter className="flex justify-center flex-col space-y-2">
           <div className="text-sm text-center text-muted-foreground">
