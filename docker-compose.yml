@@ -31,12 +31,15 @@ services:
       - DEPLOYMENT_ENV=development
       - USE_SQLITE=false
       - DEBUG=true
-
-
-
     restart: unless-stopped
     volumes:
       - ./server/src:/app
-      - ./server/.env:/app/.env
     networks:
       - deeppurple-network
+
+volumes:
+  postgres_data:
+
+networks:
+  deeppurple-network:
+    driver: bridge
