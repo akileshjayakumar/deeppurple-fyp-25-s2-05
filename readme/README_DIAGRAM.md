@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a comprehensive architecture diagram for the DeepPurple text analysis platform, showing the complete tech stack from frontend to database with cloud services integration.
+This document provides a comprehensive architecture diagram for the DeepPurple text analysis platform, showing the complete tech stack from frontend to database with cloud services integration. The diagrams are designed to be easy to understand for beginners while providing valuable technical insights.
 
 ## System Architecture
 
@@ -11,16 +11,16 @@ This document provides a comprehensive architecture diagram for the DeepPurple t
 ```mermaid
 graph TB
     subgraph "External Systems"
-        User[👤 End User]
-        Admin[👤 Admin User]
-        OpenAI[🤖 OpenAI API]
-        S3[☁️ AWS S3/MinIO]
+        User["End User"]
+        Admin["Admin User"]
+        OpenAI["OpenAI API"]
+        S3["AWS S3/MinIO"]
     end
 
     subgraph "DeepPurple Platform"
-        Frontend[🌐 Next.js Frontend<br/>React 19, TypeScript<br/>Tailwind CSS, Radix UI]
-        Backend[⚙️ FastAPI Backend<br/>Python 3.10<br/>SQLAlchemy ORM]
-        Database[🗄️ Database<br/>PostgreSQL/SQLite<br/>Connection Pooling]
+        Frontend["Next.js Frontend<br/>React 19, TypeScript<br/>Tailwind CSS, Radix UI"]
+        Backend["FastAPI Backend<br/>Python 3.10<br/>SQLAlchemy ORM"]
+        Database["Database<br/>PostgreSQL/SQLite<br/>Connection Pooling"]
     end
 
     User -->|HTTPS| Frontend
@@ -36,90 +36,90 @@ graph TB
 ```mermaid
 graph TB
     subgraph "Client Tier - Port 3000"
-        NextJS[🌐 Next.js 15.3.2<br/>- React 19 Components<br/>- Server Side Rendering<br/>- TypeScript<br/>- Tailwind CSS + Radix UI]
+        NextJS["Next.js 15.3.2<br/>- React 19 Components<br/>- Server Side Rendering<br/>- TypeScript<br/>- Tailwind CSS + Radix UI"]
 
         subgraph "Frontend Features"
-            Auth[🔐 Authentication Pages]
-            Dashboard[📊 Dashboard & Analytics]
-            Sessions[📝 Session Management]
-            Profile[👤 User Profile]
-            FileUpload[📁 File Upload Interface]
+            Auth["Authentication Pages"]
+            Dashboard["Dashboard & Analytics"]
+            Sessions["Session Management"]
+            Profile["User Profile"]
+            FileUpload["File Upload Interface"]
         end
     end
 
     subgraph "API Gateway Tier - Port 8000"
-        FastAPI[⚙️ FastAPI Application<br/>- Uvicorn ASGI Server<br/>- CORS Middleware<br/>- JWT Authentication<br/>- Pydantic Validation]
+        FastAPI["FastAPI Application<br/>- Uvicorn ASGI Server<br/>- CORS Middleware<br/>- JWT Authentication<br/>- Pydantic Validation"]
 
         subgraph "API Endpoints"
-            AuthAPI[🔑 /auth - Login/Signup]
-            UserAPI[👤 /users - Profile Management]
-            SessionAPI[📝 /sessions - Session CRUD]
-            FileAPI[📁 /files - File Operations]
-            AnalysisAPI[🧠 /analysis - Text Analysis]
-            AdminAPI[⚖️ /admin - Admin Functions]
+            AuthAPI["/auth - Login/Signup"]
+            UserAPI["/users - Profile Management"]
+            SessionAPI["/sessions - Session CRUD"]
+            FileAPI["/files - File Operations"]
+            AnalysisAPI["/analysis - Text Analysis"]
+            AdminAPI["/admin - Admin Functions"]
         end
     end
 
     subgraph "Business Logic Tier"
         subgraph "Core Services"
-            AuthService[🔐 Authentication Service<br/>- JWT Token Management<br/>- Password Hashing<br/>- Admin Authorization]
+            AuthService["Authentication Service<br/>- JWT Token Management<br/>- Password Hashing<br/>- Admin Authorization"]
 
-            TextAnalyzer[🧠 Text Analysis Engine<br/>- Sentiment Analysis<br/>- Emotion Detection<br/>- Topic Extraction<br/>- Text Summarization]
+            TextAnalyzer["Text Analysis Engine<br/>- Sentiment Analysis<br/>- Emotion Detection<br/>- Topic Extraction<br/>- Text Summarization"]
 
-            FileProcessor[📄 File Processing Service<br/>- PDF Parser (PyPDF2)<br/>- CSV Parser (Pandas)<br/>- TXT Parser<br/>- Content Extraction]
+            FileProcessor["File Processing Service<br/>- PDF Parser (PyPDF2)<br/>- CSV Parser (Pandas)<br/>- TXT Parser<br/>- Content Extraction"]
 
-            S3Manager[☁️ Storage Manager<br/>- File Upload/Download<br/>- Presigned URLs<br/>- Local Development Mode]
+            S3Manager["Storage Manager<br/>- File Upload/Download<br/>- Presigned URLs<br/>- Local Development Mode"]
         end
     end
 
     subgraph "Data Tier"
-        Database[(🗄️ Database<br/>PostgreSQL/SQLite<br/>Connection Pooling<br/>Auto-migration)]
+        Database[("Database<br/>PostgreSQL/SQLite<br/>Connection Pooling<br/>Auto-migration")]
 
         subgraph "Database Tables"
-            Users[👥 users<br/>- Authentication<br/>- Profile Data<br/>- User Tiers]
-            SessionsTable[📝 sessions<br/>- Analysis Sessions<br/>- User Ownership]
-            Files[📁 files<br/>- File Metadata<br/>- S3 Keys]
-            FileContents[📄 file_contents<br/>- Extracted Text<br/>- Processing Status]
-            Insights[💡 insights<br/>- Analysis Results<br/>- JSON Data]
-            Questions[❓ questions<br/>- User Queries<br/>- AI Responses]
+            Users["users<br/>- Authentication<br/>- Profile Data<br/>- User Tiers"]
+            SessionsTable["sessions<br/>- Analysis Sessions<br/>- User Ownership"]
+            Files["files<br/>- File Metadata<br/>- S3 Keys"]
+            FileContents["file_contents<br/>- Extracted Text<br/>- Processing Status"]
+            Insights["insights<br/>- Analysis Results<br/>- JSON Data"]
+            Questions["questions<br/>- User Queries<br/>- AI Responses"]
         end
     end
 
     subgraph "External Services"
-        OpenAI[🤖 OpenAI API<br/>- GPT Models<br/>- Text Analysis<br/>- Q&A Generation]
+        OpenAI["OpenAI API<br/>- GPT Models<br/>- Text Analysis<br/>- Q&A Generation"]
 
-        Storage[☁️ File Storage<br/>AWS S3 (Production)<br/>MinIO (Development)<br/>Local FS (Fallback)]
+        Storage["File Storage<br/>AWS S3 (Production)<br/>MinIO (Development)<br/>Local FS (Fallback)"]
     end
 
     %% Client Connections
-    NextJS -->|HTTP/HTTPS<br/>API Calls| FastAPI
-    Auth -->|JWT Tokens| AuthAPI
-    Dashboard -->|Session Data| SessionAPI
-    Sessions -->|CRUD Operations| SessionAPI
-    Profile -->|User Updates| UserAPI
-    FileUpload -->|Multipart Form| FileAPI
+    NextJS -->|"HTTP/HTTPS<br/>API Calls"| FastAPI
+    Auth -->|"JWT Tokens"| AuthAPI
+    Dashboard -->|"Session Data"| SessionAPI
+    Sessions -->|"CRUD Operations"| SessionAPI
+    Profile -->|"User Updates"| UserAPI
+    FileUpload -->|"Multipart Form"| FileAPI
 
     %% API to Services
-    AuthAPI -->|User Validation| AuthService
-    SessionAPI -->|Business Logic| TextAnalyzer
-    FileAPI -->|File Processing| FileProcessor
-    AnalysisAPI -->|AI Processing| TextAnalyzer
-    AdminAPI -->|Admin Logic| AuthService
+    AuthAPI -->|"User Validation"| AuthService
+    SessionAPI -->|"Business Logic"| TextAnalyzer
+    FileAPI -->|"File Processing"| FileProcessor
+    AnalysisAPI -->|"AI Processing"| TextAnalyzer
+    AdminAPI -->|"Admin Logic"| AuthService
 
     %% Service Interactions
-    AuthService -->|User Queries| Database
-    TextAnalyzer -->|AI Requests| OpenAI
-    TextAnalyzer -->|Store Results| Database
-    FileProcessor -->|Store Files| Storage
-    FileProcessor -->|Store Metadata| Database
-    S3Manager -->|File Operations| Storage
+    AuthService -->|"User Queries"| Database
+    TextAnalyzer -->|"AI Requests"| OpenAI
+    TextAnalyzer -->|"Store Results"| Database
+    FileProcessor -->|"Store Files"| Storage
+    FileProcessor -->|"Store Metadata"| Database
+    S3Manager -->|"File Operations"| Storage
 
     %% Database Relationships
-    Users ||--o{ SessionsTable : owns
-    SessionsTable ||--o{ Files : contains
-    Files ||--|| FileContents : has
-    SessionsTable ||--o{ Insights : generates
-    SessionsTable ||--o{ Questions : asks
+    Users ||--o{ SessionsTable : "owns"
+    SessionsTable ||--o{ Files : "contains"
+    Files ||--|| FileContents : "has"
+    SessionsTable ||--o{ Insights : "generates"
+    SessionsTable ||--o{ Questions : "asks"
 ```
 
 ### Deployment Architecture
@@ -128,53 +128,53 @@ graph TB
 graph TB
     subgraph "Development Environment"
         subgraph "Docker Compose"
-            ClientContainer[🐳 deeppurple-client<br/>Next.js Container<br/>Port 3000 → 80<br/>Nginx serving]
-            ServerContainer[🐳 deeppurple-server<br/>FastAPI Container<br/>Port 8000<br/>Uvicorn ASGI]
+            ClientContainer["deeppurple-client<br/>Next.js Container<br/>Port 3000 → 80<br/>Nginx serving"]
+            ServerContainer["deeppurple-server<br/>FastAPI Container<br/>Port 8000<br/>Uvicorn ASGI"]
         end
 
-        LocalDB[(💾 SQLite Database<br/>./deeppurple.db<br/>File-based storage)]
-        LocalStorage[📁 Local File System<br/>./uploads/<br/>Development mode]
+        LocalDB[("SQLite Database<br/>./deeppurple.db<br/>File-based storage")]
+        LocalStorage["Local File System<br/>./uploads/<br/>Development mode"]
     end
 
     subgraph "Production Environment (AWS)"
         subgraph "Compute"
-            EBS[🐳 AWS Elastic Beanstalk<br/>Auto-scaling web servers<br/>Load balancing<br/>Health monitoring]
+            EBS["AWS Elastic Beanstalk<br/>Auto-scaling web servers<br/>Load balancing<br/>Health monitoring"]
         end
 
         subgraph "Database"
-            RDS[🗄️ AWS RDS PostgreSQL<br/>Multi-AZ deployment<br/>Automated backups<br/>Connection pooling]
+            RDS["AWS RDS PostgreSQL<br/>Multi-AZ deployment<br/>Automated backups<br/>Connection pooling"]
         end
 
         subgraph "Storage & CDN"
-            S3Bucket[☁️ AWS S3<br/>File storage<br/>Versioning<br/>Lifecycle policies]
-            CloudFront[🌐 CloudFront CDN<br/>Global distribution<br/>Edge caching]
+            S3Bucket["AWS S3<br/>File storage<br/>Versioning<br/>Lifecycle policies"]
+            CloudFront["CloudFront CDN<br/>Global distribution<br/>Edge caching"]
         end
 
         subgraph "Security & Monitoring"
-            IAM[🔐 AWS IAM<br/>Role-based access<br/>Service permissions]
-            CloudWatch[📊 CloudWatch<br/>Logging & monitoring<br/>Performance metrics]
+            IAM["AWS IAM<br/>Role-based access<br/>Service permissions"]
+            CloudWatch["CloudWatch<br/>Logging & monitoring<br/>Performance metrics"]
         end
     end
 
     subgraph "External APIs"
-        OpenAIAPI[🤖 OpenAI API<br/>Text analysis<br/>Question answering<br/>Content generation]
+        OpenAIAPI["OpenAI API<br/>Text analysis<br/>Question answering<br/>Content generation"]
     end
 
     %% Development connections
-    ClientContainer -.->|API calls| ServerContainer
-    ServerContainer -.->|SQLAlchemy ORM| LocalDB
-    ServerContainer -.->|File I/O| LocalStorage
+    ClientContainer -.->|"API calls"| ServerContainer
+    ServerContainer -.->|"SQLAlchemy ORM"| LocalDB
+    ServerContainer -.->|"File I/O"| LocalStorage
 
     %% Production connections
-    EBS -->|Database queries| RDS
-    EBS -->|File operations| S3Bucket
-    CloudFront -->|Static assets| S3Bucket
-    EBS -->|AI requests| OpenAIAPI
-    EBS -.->|Logging| CloudWatch
+    EBS -->|"Database queries"| RDS
+    EBS -->|"File operations"| S3Bucket
+    CloudFront -->|"Static assets"| S3Bucket
+    EBS -->|"AI requests"| OpenAIAPI
+    EBS -.->|"Logging"| CloudWatch
 
     %% Security
-    IAM -.->|Permissions| EBS
-    IAM -.->|Permissions| S3Bucket
+    IAM -.->|"Permissions"| EBS
+    IAM -.->|"Permissions"| S3Bucket
 ```
 
 ## Technology Stack Breakdown
@@ -299,6 +299,46 @@ sequenceDiagram
     F-->>U: Display answer
 ```
 
+### Text Analysis Process Flow
+
+```mermaid
+flowchart TD
+    subgraph "Input Sources"
+        Upload["File Upload"] --> Extract["Text Extraction"]  
+        DirectText["Direct Text Input"] --> Process
+        Extract --> Process["Process Text"]  
+    end
+    
+    subgraph "Analysis Pipeline"
+        Process --> Sentiment["Sentiment Analysis"] 
+        Process --> Emotion["Emotion Detection"] 
+        Process --> Topics["Topic Extraction"] 
+        Process --> Summary["Text Summarization"] 
+    end
+    
+    subgraph "AI Processing"
+        Sentiment --> OpenAI["OpenAI GPT Model"] 
+        Emotion --> OpenAI 
+        Topics --> OpenAI 
+        Summary --> OpenAI 
+        OpenAI --> Results["Structured Analysis Results"] 
+    end
+    
+    subgraph "Data Storage"
+        Results --> DB[("Database")] 
+        DB --> Insights["Insights Table"] 
+    end
+    
+    subgraph "User Interface"
+        Results --> UI["Frontend Display"] 
+        UI --> Charts["Interactive Charts"] 
+        UI --> TextDisplay["Formatted Text Results"] 
+        UI --> QA["Question & Answer Interface"] 
+    end
+    
+    QA --> |"New Questions"| Process
+```
+
 ## Security Architecture
 
 ### Authentication & Authorization
@@ -387,4 +427,3 @@ sequenceDiagram
 3. **Environment Variables**: Secure configuration management
 4. **Database Migration**: Automated schema updates
 
-This architecture provides a scalable, secure, and maintainable foundation for the DeepPurple text analysis platform, with clear separation of concerns and robust error handling throughout the system.
