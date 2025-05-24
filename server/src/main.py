@@ -40,6 +40,7 @@ async def lifespan(app: FastAPI):
 
         # Create database tables - skip in Lambda environment
         if not settings.IS_LAMBDA:
+            logger.info("Creating database tables...")
             Base.metadata.create_all(bind=engine)
             logger.debug("Database tables created successfully")
         else:

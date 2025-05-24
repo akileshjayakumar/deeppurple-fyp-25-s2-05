@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from schemas import schemas
 from core.auth import (
     get_password_hash, verify_password, create_access_token,
-    get_current_active_user, add_token_to_blacklist, oauth2_scheme
+    get_current_active_user, add_token_to_blacklist, oauth2_scheme,
+    verify_google_token
 )
 from core.config import settings
 from core.database import get_db
@@ -162,22 +163,45 @@ async def login_with_google(
         Token: JWT access token for authenticated session
     """
     try:
-        # TODO: Implement Google token verification
         # 1. Verify the Google token ID with Google's API
         # 2. Extract user information from the verified token
         # 3. Check if user exists in database, create if not
         # 4. Generate and return JWT token
 
-        # This is a placeholder implementation
-        # In a real implementation, you would verify the token with Google
         logger.info(f"Processing Google authentication request")
+        idinfo = await verify_google_token(google_auth.token_id)
+        logger.info(f"Google token verified: {idinfo}")
 
-        # Placeholder: Create or get user based on Google profile
-        # For now, throw an exception so clients know this isn't implemented yet
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Google authentication is not fully implemented yet"
+        existing_user = db.query(User).filter(User.google_id == idinfo["sub"]).first()
+        user_id = existing_user.id if existing_user else None
+        if not existing_user:
+            logger.info(f"Creating new user: {idinfo['email']}")
+            # Create new user
+            new_user = User(
+                email=idinfo["email"],
+                full_name=idinfo["name"],
+                profile_picture=idinfo["picture"],
+                google_id=idinfo["sub"],
+                is_active=True,
+                is_admin=False
+            )
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
+            logger.info(f"New user created: {new_user.email}")
+            user_id = new_user.id
+        
+        # Generate and return JWT token
+        access_token_expires = timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": str(user_id)}, expires_delta=access_token_expires
         )
+        logger.info(f"Access token created for user: {user_id}")
+        return {
+            "access_token": access_token,  # Placeholder: Generate JWT token
+            "token_type": "bearer"
+        }
 
     except Exception as e:
         logger.error(f"Google authentication error: {str(e)}")

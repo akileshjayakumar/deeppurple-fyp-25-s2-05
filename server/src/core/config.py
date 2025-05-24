@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     # OpenAI settings
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
+    # Google settings
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+
     class Config:
         """Pydantic settings configuration."""
         env_file = ".env"
