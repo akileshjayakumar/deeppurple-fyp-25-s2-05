@@ -6,7 +6,7 @@ This document provides a comprehensive architecture diagram for the DeepPurple t
 
 ## System Architecture
 
-### High-Level Architecture (C4 Model - System Context)
+### high-level-system-architecture-diagram.png
 
 ```mermaid
 graph TB
@@ -14,13 +14,13 @@ graph TB
         User["End User"]
         Admin["Admin User"]
         OpenAI["OpenAI API"]
-        S3["AWS S3/MinIO"]
+        S3["AWS S3 Bucket"]
     end
 
     subgraph "DeepPurple Platform"
         Frontend["Next.js Frontend<br/>React 19, TypeScript<br/>Tailwind CSS, Radix UI"]
         Backend["FastAPI Backend<br/>Python 3.10<br/>SQLAlchemy ORM"]
-        Database["Database<br/>PostgreSQL/SQLite<br/>Connection Pooling"]
+        Database["PostgreSQL Database<br/>Connection Pooling"]
     end
 
     User -->|HTTPS| Frontend
@@ -31,7 +31,7 @@ graph TB
     Backend -->|Text Analysis<br/>HTTP/JSON| OpenAI
 ```
 
-### Container Diagram (Detailed Services)
+### software_architecture_diagram.png
 
 ```mermaid
 graph TB
@@ -115,14 +115,14 @@ graph TB
     S3Manager -->|"File Operations"| Storage
 
     %% Database Relationships
-    Users ||--o{ SessionsTable : "owns"
-    SessionsTable ||--o{ Files : "contains"
-    Files ||--|| FileContents : "has"
-    SessionsTable ||--o{ Insights : "generates"
-    SessionsTable ||--o{ Questions : "asks"
+    Users -->|"owns"| SessionsTable
+    SessionsTable -->|"contains"| Files
+    Files -->|"has"| FileContents
+    SessionsTable -->|"generates"| Insights
+    SessionsTable -->|"asks"| Questions
 ```
 
-### Deployment Architecture
+### deployment_architecture_diagram.png
 
 ```mermaid
 graph TB
@@ -299,44 +299,76 @@ sequenceDiagram
     F-->>U: Display answer
 ```
 
-### Text Analysis Process Flow
+### high_level_data_flow_diagram.png (Text Analysis Process Flow)
 
 ```mermaid
 flowchart TD
-    subgraph "Input Sources"
-        Upload["File Upload"] --> Extract["Text Extraction"]  
-        DirectText["Direct Text Input"] --> Process
-        Extract --> Process["Process Text"]  
-    end
-    
-    subgraph "Analysis Pipeline"
-        Process --> Sentiment["Sentiment Analysis"] 
-        Process --> Emotion["Emotion Detection"] 
-        Process --> Topics["Topic Extraction"] 
-        Process --> Summary["Text Summarization"] 
-    end
-    
-    subgraph "AI Processing"
-        Sentiment --> OpenAI["OpenAI GPT Model"] 
-        Emotion --> OpenAI 
-        Topics --> OpenAI 
-        Summary --> OpenAI 
-        OpenAI --> Results["Structured Analysis Results"] 
-    end
-    
-    subgraph "Data Storage"
-        Results --> DB[("Database")] 
-        DB --> Insights["Insights Table"] 
-    end
-    
-    subgraph "User Interface"
-        Results --> UI["Frontend Display"] 
-        UI --> Charts["Interactive Charts"] 
-        UI --> TextDisplay["Formatted Text Results"] 
-        UI --> QA["Question & Answer Interface"] 
-    end
-    
-    QA --> |"New Questions"| Process
+ subgraph subGraph0["Input Sources"]
+        Extract["Text Extraction"]
+        Upload["File Upload"]
+        Process["Process Text"]
+        DirectText["Direct Text Input"]
+  end
+ subgraph subGraph1["Analysis Pipeline"]
+        Sentiment["Sentiment Analysis"]
+        Emotion["Emotion Detection"]
+        Topics["Topic Extraction"]
+        Summary["Text Summarization"]
+  end
+ subgraph subGraph2["AI Processing"]
+        OpenAI["OpenAI GPT Model"]
+        Results["Structured Analysis Results"]
+  end
+ subgraph subGraph3["Data Storage"]
+        DB[("Database")]
+        Insights["Insights Table"]
+  end
+ subgraph subGraph4["User Interface"]
+        UI["Frontend Display"]
+        TextDisplay["Formatted Text Results"]
+        QA["Question & Answer Interface"]
+  end
+    Upload --> Extract
+    DirectText --> Process
+    Extract --> Process
+    Process --> Sentiment & Emotion & Topics & Summary
+    Sentiment --> OpenAI
+    Emotion --> OpenAI
+    Topics --> OpenAI
+    Summary --> OpenAI
+    OpenAI --> Results
+    Results --> DB & UI
+    DB --> Insights
+    UI --> TextDisplay & QA
+    QA -- New Questions --> Process
+
+    %% Input Sources - Light Blue (Entry Points)
+    classDef inputClass stroke:#000000,stroke-width:2px,fill:#E3F2FD,color:#000000
+    class Upload,DirectText,Extract,Process inputClass
+
+    %% Analysis Pipeline - Light Green (Processing)
+    classDef analysisClass stroke:#000000,stroke-width:2px,fill:#E8F5E8,color:#000000
+    class Sentiment,Emotion,Topics,Summary analysisClass
+
+    %% AI Processing - Orange (Core AI)
+    classDef aiClass stroke:#000000,stroke-width:2px,fill:#FFF3E0,color:#000000
+    class OpenAI,Results aiClass
+
+    %% Data Storage - Light Purple (Persistence)
+    classDef storageClass stroke:#000000,stroke-width:2px,fill:#F3E5F5,color:#000000
+    class DB,Insights storageClass
+
+    %% User Interface - Light Yellow (Output/Interaction)
+    classDef uiClass stroke:#000000,stroke-width:2px,fill:#FFFDE7,color:#000000
+    class UI,TextDisplay,QA uiClass
+
+    %% Subgraph borders with matching colors
+    style subGraph0 stroke:#1976D2,stroke-width:3px,fill:#E3F2FD20
+    style subGraph1 stroke:#388E3C,stroke-width:3px,fill:#E8F5E820
+    style subGraph2 stroke:#F57C00,stroke-width:3px,fill:#FFF3E020
+    style subGraph3 stroke:#7B1FA2,stroke-width:3px,fill:#F3E5F520
+    style subGraph4 stroke:#F9A825,stroke-width:3px,fill:#FFFDE720
+
 ```
 
 ## Security Architecture
@@ -426,4 +458,3 @@ flowchart TD
 2. **Infrastructure**: AWS ECS with RDS and S3
 3. **Environment Variables**: Secure configuration management
 4. **Database Migration**: Automated schema updates
-
