@@ -5,11 +5,14 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from google.oauth2 import id_token
+from google.auth.transport import requests
 
 from core.config import settings
 from core.database import get_db
 from models.models import User
 from schemas.schemas import TokenData
+from utils.logger import logger
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -233,23 +236,11 @@ async def verify_google_token(token_id: str) -> dict:
     Raises:
         HTTPException: If token verification fails
     """
-    # TODO: Implement actual Google token verification
-    # In a real implementation, you would use the google-auth library to verify the token
-
-    # This is a placeholder implementation
-    logger.warning("Using placeholder Google token verification")
-
+    # Verify the token with Google
     try:
-        # Placeholder logic - in a real implementation, you would verify with Google
-        # from google.oauth2 import id_token
-        # from google.auth.transport import requests
-        # user_info = id_token.verify_oauth2_token(token_id, requests.Request(), settings.GOOGLE_CLIENT_ID)
-
-        # For now, return a 501 Not Implemented error
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Google authentication is not fully implemented yet"
-        )
+        idinfo = id_token.verify_oauth2_token(
+            token_id, requests.Request(), settings.GOOGLE_CLIENT_ID)
+        return idinfo
 
     except Exception as e:
         logger.error(f"Error verifying Google token: {str(e)}")

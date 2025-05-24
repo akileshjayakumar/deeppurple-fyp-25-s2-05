@@ -68,6 +68,11 @@ export const authApi = {
     return response.data;
   },
 
+  googleLogin: async (token_id: string) => {
+    const response = await api.post("/auth/google", { token_id });
+    return response.data;
+  },
+
   signup: async (userData: {
     email: string;
     fullName: string;

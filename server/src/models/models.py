@@ -32,7 +32,8 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)
+    # Password is not required for OAuth users
     full_name = Column(String(255), nullable=True)
     profile_picture = Column(String(512), nullable=True)
     is_active = Column(Boolean, default=True)
@@ -40,6 +41,8 @@ class User(Base):
     user_tier = Column(String(50), default="basic", nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    # Google Unique User ID
+    google_id = Column(String(255), nullable=True)
 
     # Relationships
     sessions = relationship(

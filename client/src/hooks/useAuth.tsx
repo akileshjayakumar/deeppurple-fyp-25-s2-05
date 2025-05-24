@@ -10,6 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  googleLogin: (credential: string) => Promise<void>;
   signup: (
     email: string,
     fullName: string,
@@ -62,6 +63,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     checkAuth();
   }, [pathname, router]);
+
+  // Google login function
+  const googleLogin = async (credential: string) => {
+    setIsLoading(true);
+    try {
+      if (!credential) {
+        throw new Error("No credential provided");
+      }
+      const authResponse: AuthResponse = await authApi.googleLogin(credential);
+      console.log("Google login response:", authResponse);
+      localStorage.setItem("token", authResponse.access_token);
+      const userData = await authApi.getCurrentUser();
+      setUser(userData);
+
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Google login error:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Login function
   const login = async (email: string, password: string) => {
@@ -128,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isAuthenticated, login, signup, logout }}
+      value={{ user, isLoading, isAuthenticated, login, signup, logout, googleLogin }}
     >
       {children}
     </AuthContext.Provider>
