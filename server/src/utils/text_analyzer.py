@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List, Any, Tuple, AsyncGenerator, Optional
+from typing import Dict, List, Any, Tuple, AsyncGenerator
 import json
 import logging
 import traceback
@@ -7,7 +7,6 @@ import asyncio
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
-from fastapi import HTTPException
 
 from core.config import settings
 
@@ -26,24 +25,12 @@ def get_openai_llm(temperature: float = 0.0, streaming: bool = False):
     Returns:
         An OpenAI LLM instance
     """
-    try:
-        # Log the API key presence (not the actual key)
-        logger.debug(
-            f"OpenAI API Key present: {bool(settings.OPENAI_API_KEY)}")
-
-        # Use ChatOpenAI
-        return ChatOpenAI(
-            api_key=settings.OPENAI_API_KEY,
-            temperature=temperature,
-            model="gpt-4o",
-            streaming=streaming
-        )
-    except Exception as e:
-        logger.error(f"Failed to initialize OpenAI LLM: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to initialize OpenAI LLM: {str(e)}"
-        )
+    return ChatOpenAI(
+        api_key=settings.OPENAI_API_KEY,
+        temperature=temperature,
+        model="gpt-4o",
+        streaming=streaming
+    )
 
 
 def analyze_text(text: str) -> Dict[str, Any]:
@@ -56,38 +43,85 @@ def analyze_text(text: str) -> Dict[str, Any]:
     Returns:
         Dict with analysis results containing sentiment, emotions, topics, and summary
     """
-    # Check if OpenAI API key is missing or invalid
-    if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY == "" or settings.OPENAI_API_KEY.startswith("sk-dummy"):
-        logger.warning("Using mock analysis for text (no valid API key)")
-        return generate_mock_analysis(text)
-
     try:
         logger.info("Starting text analysis with OpenAI")
 
         # Create the LLM
-        llm = get_openai_llm(temperature=0.3)
+        llm = get_openai_llm(temperature=0.2)
 
         # Create the prompt template for analysis
         prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template(
-                "You are an expert text analyst. Analyze the following text and provide insights."
+                """You are DeepPurple, an expert text analysis system specializing in sentiment analysis, emotion detection, text summarization, topic modeling, and syntax analysis.
+
+Your task is to analyze the provided text with precision and nuance, following these guidelines:
+
+1. SENTIMENT ANALYSIS:
+   - Evaluate the overall sentiment (positive, negative, neutral)
+   - Assign numerical scores (0.0-1.0) for each sentiment category
+   - Consider contextual cues, sarcasm, and implicit attitudes
+   - Identify sentiment shifts throughout the text
+
+2. EMOTION DETECTION:
+   - Identify the presence and intensity of six core emotions: joy, sadness, anger, fear, surprise, and disgust
+   - Assign numerical scores (0.0-1.0) for each emotion
+   - Determine the dominant emotion based on contextual significance, not just frequency
+   - Consider emotional triggers and responses in the text
+
+3. TOPIC MODELING:
+   - Extract 3-5 distinct topics that represent the main themes
+   - Ensure topics are specific, meaningful, and non-overlapping
+   - Each topic should be labeled with a concise phrase (2-4 words)
+   - Topics should capture the essential subject matter, not just frequent terms
+
+4. TEXT SUMMARIZATION:
+   - Create a concise summary (1-3 paragraphs) that captures the key points
+   - Preserve the original meaning, intent, and tone
+   - Include critical details while eliminating redundancy
+   - Ensure the summary is coherent and stands alone
+
+5. SYNTAX ANALYSIS (implicit in your processing):
+   - Consider sentence structure, grammatical patterns, and linguistic features
+   - Use this understanding to refine your other analyses
+
+Be objective, accurate, and comprehensive in your analysis. Your output will be used for communication analysis, research, and decision-making.
+"""
             ),
             HumanMessagePromptTemplate.from_template(
-                """Analyze the following text and provide:
-                1. Sentiment analysis (positive, negative, neutral scores, and overall sentiment)
-                2. Emotion detection (joy, sadness, anger, fear, surprise, disgust scores, and dominant emotion)
-                3. Key topics (up to 5)
-                4. A brief summary
+                """Analyze the following text enclosed between triple backticks:
 
-                Text to analyze: {text}
+```
+{text}
+```
                 
-                Format your response as a JSON object with the following structure:
-                {{
-                    "sentiment": {{"positive": float, "negative": float, "neutral": float, "overall": string}},
-                    "emotions": {{"joy": float, "sadness": float, "anger": float, "fear": float, "surprise": float, "disgust": float, "dominant_emotion": string}},
-                    "topics": [string, string, ...],
-                    "summary": string
-                }}"""
+Format your response as a JSON object with the following structure:
+{
+    "sentiment": {
+        "positive": float,  // Score between 0.0-1.0
+        "negative": float,  // Score between 0.0-1.0
+        "neutral": float,   // Score between 0.0-1.0
+        "overall": string   // "positive", "negative", or "neutral"
+    },
+    "emotions": {
+        "joy": float,       // Score between 0.0-1.0
+        "sadness": float,   // Score between 0.0-1.0
+        "anger": float,     // Score between 0.0-1.0
+        "fear": float,      // Score between 0.0-1.0
+        "surprise": float,  // Score between 0.0-1.0
+        "disgust": float,   // Score between 0.0-1.0
+        "dominant_emotion": string  // The emotion with highest contextual significance
+    },
+    "topics": [
+        {
+            "name": string,  // Concise topic label (2-4 words)
+            "keywords": [string, string, string]  // 3 representative keywords
+        },
+        // Additional topics...
+    ],
+    "summary": string  // Concise summary of the text
+}
+
+Ensure your response is valid JSON and follows this exact structure."""
             )
         ])
 
@@ -96,81 +130,14 @@ def analyze_text(text: str) -> Dict[str, Any]:
         response = chain.invoke({"text": text[:10000]})  # Limit text length
 
         # Parse the JSON response
-        try:
-            results = json.loads(response)
-            logger.debug("Successfully parsed analysis response")
-            return results
-        except json.JSONDecodeError:
-            logger.error("Failed to parse OpenAI response as JSON")
-            return generate_mock_analysis(text)
+        results = json.loads(response)
+        logger.debug("Successfully parsed analysis response")
+        return results
 
     except Exception as e:
         logger.error(f"Error during text analysis: {str(e)}")
         logger.debug(traceback.format_exc())
-        return generate_mock_analysis(text)
-
-
-def generate_mock_analysis(text: str) -> Dict[str, Any]:
-    """
-    Generate basic mock analysis results when OpenAI is unavailable.
-
-    Args:
-        text: The text to analyze
-
-    Returns:
-        Dict with mock analysis results
-    """
-    logger.info("Generating mock analysis")
-
-    # Simple sentiment detection
-    text_lower = text.lower()
-    positive_words = ["good", "great", "excellent",
-                      "amazing", "happy", "love", "best"]
-    negative_words = ["bad", "terrible", "awful",
-                      "horrible", "sad", "hate", "worst"]
-
-    positive_count = sum(1 for word in positive_words if word in text_lower)
-    negative_count = sum(1 for word in negative_words if word in text_lower)
-    total = positive_count + negative_count
-
-    if total == 0:
-        sentiment = {"positive": 0.1, "negative": 0.1,
-                     "neutral": 0.8, "overall": "neutral"}
-    else:
-        pos_score = min(positive_count / (total * 1.5), 1.0)
-        neg_score = min(negative_count / (total * 1.5), 1.0)
-        neu_score = max(0, 1.0 - (pos_score + neg_score))
-
-        if pos_score > neg_score and pos_score > neu_score:
-            overall = "positive"
-        elif neg_score > pos_score and neg_score > neu_score:
-            overall = "negative"
-        else:
-            overall = "neutral"
-
-        sentiment = {"positive": pos_score, "negative": neg_score,
-                     "neutral": neu_score, "overall": overall}
-
-    # Simple summary
-    if len(text) > 300:
-        summary = text[:297] + "..."
-    else:
-        summary = text
-
-    return {
-        "sentiment": sentiment,
-        "emotions": {
-            "joy": 0.2,
-            "sadness": 0.2,
-            "anger": 0.1,
-            "fear": 0.1,
-            "surprise": 0.2,
-            "disgust": 0.1,
-            "dominant_emotion": "neutral"
-        },
-        "topics": ["topic1", "topic2", "topic3"],
-        "summary": summary
-    }
+        raise
 
 
 def answer_question(question: str, context: str, conversation_history: List[Dict[str, str]] = None) -> Tuple[str, List[str]]:
@@ -185,11 +152,6 @@ def answer_question(question: str, context: str, conversation_history: List[Dict
     Returns:
         Tuple containing the answer and sources
     """
-    # Check if OpenAI API key is missing or invalid
-    if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY == "" or settings.OPENAI_API_KEY.startswith("sk-dummy"):
-        logger.warning("Using mock question answering (no valid API key)")
-        return (f"Based on the information provided, I would answer your question about '{question}' as follows: This appears to be text discussing analysis and communication concepts.", ["Context analysis"])
-
     try:
         logger.debug(f"Starting to answer question: '{question[:50]}...'")
 
@@ -202,18 +164,53 @@ def answer_question(question: str, context: str, conversation_history: List[Dict
 
         # Create the chat template
         system_message = SystemMessagePromptTemplate.from_template(
-            "You are a helpful assistant that answers questions based on provided context. "
-            "If the context is empty, use your general knowledge to provide a helpful answer. "
-            "If the answer cannot be found in the provided context, state that clearly and offer what you know about the topic."
+            """You are DeepPurple, an AI assistant specializing in text analysis with expertise in sentiment analysis, emotion detection, text summarization, topic modeling, and syntax analysis.
+
+Your primary goal is to help users analyze text and provide insights. When users upload files or provide text, you analyze the content and answer questions about it.
+
+When responding to users:
+1. Be conversational, helpful, and engaging
+2. If a user asks what you can do, explain your text analysis capabilities (sentiment analysis, emotion detection, etc.)
+3. If a user asks a general question without providing text to analyze:
+   - Answer naturally using your knowledge
+   - Don't mention "missing context" or suggest uploading files unless specifically asked
+   - Maintain a helpful tone focused on text analysis as your specialty
+
+Your text analysis capabilities:
+- Sentiment Analysis: Detecting positive, negative, or neutral sentiment in text
+- Emotion Detection: Identifying emotions like joy, sadness, anger, fear, surprise, and disgust
+- Text Summarization: Creating concise summaries of longer content
+- Topic Modeling: Extracting key themes and topics from text
+- Interactive Q&A: Answering questions about analyzed text
+
+When text is provided for analysis:
+1. COMPREHENSION: Carefully analyze both the question and context
+2. REASONING: Use step-by-step reasoning for accurate answers
+3. VERIFICATION: Ensure your answer is directly supported by the context
+4. CITATION: Reference specific parts of the context when relevant
+5. CLARITY: Present information in a structured, easy-to-understand format
+
+Always maintain a helpful, informative tone while prioritizing accuracy.
+"""
         )
 
         human_message = HumanMessagePromptTemplate.from_template(
-            "Previous conversation:\n{conversation_history}\n\n"
-            "Context: {context}\n\n"
-            "Question: {question}\n\n"
-            "Provide your answer in the following format:\n"
-            "Answer: [Your comprehensive answer here]\n"
-            "Sources: [List of relevant segments from the context that support your answer, or 'General knowledge' if using general knowledge]"
+            """Previous conversation:
+{conversation_history}
+
+Context:
+```
+{context}
+```
+
+Question: {question}
+
+Answer my question helpfully. If I've provided text to analyze, base your response on that text. If not, just answer naturally without mentioning the need for context.
+
+Format your response as follows:
+1. First provide your comprehensive answer
+2. Then on a new line after "Sources:", list the specific sections from the context that support your answer, or indicate "General knowledge" if using information outside the context. Only include this Sources section if I've provided text to analyze.
+"""
         )
 
         chat_prompt = ChatPromptTemplate.from_messages(
@@ -238,20 +235,16 @@ def answer_question(question: str, context: str, conversation_history: List[Dict
         sources = []
 
         # Simple parsing of the response format
-        for line in response.split('\n'):
-            if line.startswith("Answer:"):
-                answer = line[7:].strip()
-            elif line.startswith("Sources:"):
-                sources_text = line[8:].strip()
-                # Convert sources text to list
-                if sources_text.startswith('[') and sources_text.endswith(']'):
-                    try:
-                        sources = json.loads(sources_text)
-                    except:
-                        sources = [s.strip()
-                                   for s in sources_text[1:-1].split(',')]
-                else:
-                    sources = [sources_text]
+        parts = response.split("Sources:", 1)
+        if len(parts) > 1:
+            answer = parts[0].strip()
+            sources_text = parts[1].strip()
+            # Convert sources text to list
+            sources = [s.strip()
+                       for s in sources_text.split("\n") if s.strip()]
+        else:
+            answer = response
+            sources = []
 
         # If parsing failed, use the whole response as the answer
         if not answer:
@@ -262,7 +255,7 @@ def answer_question(question: str, context: str, conversation_history: List[Dict
     except Exception as e:
         logger.error(f"Error answering question: {str(e)}")
         logger.debug(traceback.format_exc())
-        return "I couldn't process your question due to a technical error. Please try again later.", []
+        raise
 
 
 async def answer_question_stream(question: str, context: str, conversation_history: List[Dict[str, str]] = None) -> AsyncGenerator[str, None]:
@@ -277,21 +270,6 @@ async def answer_question_stream(question: str, context: str, conversation_histo
     Yields:
         Token by token response
     """
-    # Check if OpenAI API key is missing
-    if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY == "" or settings.OPENAI_API_KEY.startswith("sk-dummy"):
-        logger.warning("Using mock streaming answer (no valid API key)")
-        mock_answer = "I'm analyzing your question... "
-        for char in mock_answer:
-            yield char
-            await asyncio.sleep(0.01)
-
-        stream_text = f"Based on the information provided, I would answer your question about '{question}' as follows: This appears to be text discussing analysis and communication concepts."
-
-        for char in stream_text:
-            yield char
-            await asyncio.sleep(0.01)
-        return
-
     try:
         logger.debug(f"Starting to stream answer for: '{question[:50]}...'")
 
@@ -304,15 +282,49 @@ async def answer_question_stream(question: str, context: str, conversation_histo
 
         # Create the chat template
         system_message = SystemMessagePromptTemplate.from_template(
-            "You are a helpful assistant that answers questions based on provided context. "
-            "If the context is empty, use your general knowledge to provide a helpful answer. "
-            "If the answer cannot be found in the provided context, state that clearly and offer what you know about the topic."
+            """You are DeepPurple, an AI assistant specializing in text analysis with expertise in sentiment analysis, emotion detection, text summarization, topic modeling, and syntax analysis.
+
+Your primary goal is to help users analyze text and provide insights. When users upload files or provide text, you analyze the content and answer questions about it.
+
+When responding to users:
+1. Be conversational, helpful, and engaging
+2. If a user asks what you can do, explain your text analysis capabilities (sentiment analysis, emotion detection, etc.)
+3. If a user asks a general question without providing text to analyze:
+   - Answer naturally using your knowledge
+   - Don't mention "missing context" or suggest uploading files unless specifically asked
+   - Maintain a helpful tone focused on text analysis as your specialty
+
+Your text analysis capabilities:
+- Sentiment Analysis: Detecting positive, negative, or neutral sentiment in text
+- Emotion Detection: Identifying emotions like joy, sadness, anger, fear, surprise, and disgust
+- Text Summarization: Creating concise summaries of longer content
+- Topic Modeling: Extracting key themes and topics from text
+- Interactive Q&A: Answering questions about analyzed text
+
+When text is provided for analysis:
+1. COMPREHENSION: Carefully analyze both the question and context
+2. REASONING: Use step-by-step reasoning for accurate answers
+3. VERIFICATION: Ensure your answer is directly supported by the context
+4. CITATION: Reference specific parts of the context when relevant
+5. CLARITY: Present information in a structured, easy-to-understand format
+
+Always maintain a helpful, informative tone while prioritizing accuracy.
+"""
         )
 
         human_message = HumanMessagePromptTemplate.from_template(
-            "Previous conversation:\n{conversation_history}\n\n"
-            "Context: {context}\n\n"
-            "Question: {question}"
+            """Previous conversation:
+{conversation_history}
+
+Context:
+```
+{context}
+```
+
+Question: {question}
+
+Answer my question helpfully. If I've provided text to analyze, base your response on that text. If not, just answer naturally without mentioning the need for context.
+"""
         )
 
         chat_prompt = ChatPromptTemplate.from_messages(

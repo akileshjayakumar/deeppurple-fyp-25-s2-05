@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   ShieldAlert,
+  Plus,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,11 @@ function NavItem({ icon, label, href, isActive }: NavItemProps) {
     <Link href={href} className="w-full">
       <Button
         variant={isActive ? "secondary" : "ghost"}
-        className={`w-full justify-start ${isActive ? "bg-secondary" : ""}`}
+        className={`w-full justify-start ${
+          isActive
+            ? "bg-purple-50 text-purple-700 hover:bg-purple-100"
+            : "hover:bg-purple-50 hover:text-purple-700"
+        }`}
       >
         <span className="flex items-center">
           <span className="mr-2">{icon}</span>
@@ -95,14 +100,14 @@ export default function DashboardLayout({
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-white">
       {/* Mobile Header */}
-      <header className="md:hidden flex justify-between items-center p-4 border-b">
+      <header className="md:hidden flex justify-between items-center p-4 border-b bg-white shadow-sm">
         <div className="flex items-center gap-2">
-          <div className="bg-primary text-white font-bold rounded-full w-8 h-8 flex items-center justify-center">
+          <div className="bg-purple-600 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center">
             DP
           </div>
-          <h1 className="text-xl font-bold">DeepPurple</h1>
+          <h1 className="text-xl font-bold text-purple-700">DeepPurple</h1>
         </div>
 
         <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
@@ -115,10 +120,12 @@ export default function DashboardLayout({
             <div className="flex flex-col h-full">
               <div className="p-4 border-b flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <div className="bg-primary text-white font-bold rounded-full w-8 h-8 flex items-center justify-center">
+                  <div className="bg-purple-600 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center">
                     DP
                   </div>
-                  <h1 className="text-xl font-bold">DeepPurple</h1>
+                  <h1 className="text-xl font-bold text-purple-700">
+                    DeepPurple
+                  </h1>
                 </div>
                 <Button
                   variant="ghost"
@@ -126,6 +133,13 @@ export default function DashboardLayout({
                   onClick={() => setIsMobileNavOpen(false)}
                 >
                   <X size={18} />
+                </Button>
+              </div>
+
+              <div className="p-4">
+                <Button variant="outline" className="w-full justify-start mb-4">
+                  <Plus size={18} className="mr-2" />
+                  New Session
                 </Button>
               </div>
 
@@ -152,12 +166,21 @@ export default function DashboardLayout({
 
       <div className="flex h-screen md:h-screen">
         {/* Desktop Sidebar */}
-        <aside className="hidden md:flex md:w-64 border-r flex-col">
+        <aside className="hidden md:flex md:w-64 border-r flex-col bg-white">
           <div className="p-4 border-b flex items-center gap-2">
-            <div className="bg-primary text-white font-bold rounded-full w-10 h-10 flex items-center justify-center">
+            <div className="bg-purple-600 text-white font-bold rounded-full w-10 h-10 flex items-center justify-center">
               DP
             </div>
-            <h1 className="text-xl font-bold">DeepPurple</h1>
+            <h1 className="text-xl font-bold text-purple-700">DeepPurple</h1>
+          </div>
+
+          <div className="p-4">
+            <Link href="/sessions">
+              <Button variant="outline" className="w-full justify-start">
+                <Plus size={18} className="mr-2" />
+                New Session
+              </Button>
+            </Link>
           </div>
 
           <nav className="flex-1 p-4 flex flex-col gap-1">
@@ -169,7 +192,9 @@ export default function DashboardLayout({
               <div className="flex items-center gap-2">
                 <Avatar>
                   <AvatarImage src={user?.profile_picture || ""} />
-                  <AvatarFallback>{getInitials()}</AvatarFallback>
+                  <AvatarFallback className="bg-purple-100 text-purple-700">
+                    {getInitials()}
+                  </AvatarFallback>
                 </Avatar>
                 <div>
                   <p className="text-sm font-medium">
@@ -196,13 +221,15 @@ export default function DashboardLayout({
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 flex flex-col overflow-hidden bg-gray-50">
           {/* Desktop Header */}
-          <header className="hidden md:flex items-center justify-end p-4 border-b">
+          <header className="hidden md:flex items-center justify-end p-4 border-b bg-white shadow-sm">
             <div className="flex items-center">
               <Avatar className="cursor-pointer">
                 <AvatarImage src={user?.profile_picture || ""} />
-                <AvatarFallback>{getInitials()}</AvatarFallback>
+                <AvatarFallback className="bg-purple-100 text-purple-700">
+                  {getInitials()}
+                </AvatarFallback>
               </Avatar>
             </div>
           </header>

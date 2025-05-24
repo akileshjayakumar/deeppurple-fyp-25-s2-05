@@ -104,7 +104,7 @@ async def upload_file(
         # Upload file to S3
         logger.debug(f"Uploading file to S3, session ID: {session_id}")
         try:
-            s3_key = upload_file_to_s3(file, session_id)
+            s3_key = await upload_file_to_s3(content, session_id, file.filename)
             logger.info(f"File uploaded to S3, key: {s3_key}")
         except Exception as e:
             logger.error(f"S3 upload failed: {str(e)}")
@@ -133,7 +133,7 @@ async def upload_file(
         try:
             # Get file from S3 since we've already uploaded it
             logger.debug(f"Retrieving file content from S3 with key: {s3_key}")
-            file_content_bytes = get_file_from_s3(s3_key)
+            file_content_bytes = await get_file_from_s3(s3_key)
 
             if not file_content_bytes:
                 logger.error(
@@ -307,7 +307,7 @@ async def delete_file(
 
     # Delete file from S3
     try:
-        delete_file_from_s3(file.s3_key)
+        await delete_file_from_s3(file.s3_key)
     except Exception as e:
         # Log the error but continue with database deletion
         logger.error(f"Error deleting file from S3: {str(e)}")
@@ -355,6 +355,6 @@ async def get_file_download_url(
         )
 
     # Generate presigned URL
-    url = generate_presigned_url(file.s3_key)
+    url = await generate_presigned_url(file.s3_key)
 
     return {"download_url": url, "expires_in": 3600}

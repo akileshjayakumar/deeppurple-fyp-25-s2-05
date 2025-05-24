@@ -38,17 +38,8 @@ if settings.USE_SQLITE or (settings.DATABASE_URL == "postgresql://postgres:postg
         connect_args={"check_same_thread": False}  # Needed for SQLite
     )
 else:
-    # Format AWS RDS connection string if needed
-    if settings.AWS_RDS_PROXY_ENDPOINT:
-        # Using RDS Proxy for improved connection handling in Lambda
-        logger.debug(
-            f"Using AWS RDS Proxy endpoint: {settings.AWS_RDS_PROXY_ENDPOINT}")
-        db_username = os.getenv("DB_USERNAME", settings.DB_USERNAME)
-        db_password = os.getenv("DB_PASSWORD", settings.DB_PASSWORD)
-        db_name = os.getenv("DB_NAME", settings.DB_NAME)
-        db_port = os.getenv("DB_PORT", settings.DB_PORT)
-        SQLALCHEMY_DATABASE_URL = f"postgresql://{db_username}:{db_password}@{settings.AWS_RDS_PROXY_ENDPOINT}:{db_port}/{db_name}"
-    elif settings.DATABASE_URL and '://' not in settings.DATABASE_URL:
+    # Format PostgreSQL connection string for production
+    if settings.DATABASE_URL and '://' not in settings.DATABASE_URL:
         # It's just a hostname, format it as a proper PostgreSQL URL
         db_host = settings.DATABASE_URL
         db_username = os.getenv("DB_USERNAME", settings.DB_USERNAME)
@@ -61,23 +52,17 @@ else:
 
     logger.debug(f"Database URL: {SQLALCHEMY_DATABASE_URL}")
 
-    # Create engine with connection pool settings optimized for both Lambda and Beanstalk
+    # Create engine with connection pool settings optimized for Elastic Beanstalk
     try:
         engine_args = {
             "pool_pre_ping": True,  # Test connections before using them
             "pool_recycle": 3600,   # Recycle connections after 1 hour
-            "pool_size": 5,         # Smaller pool for Lambda, adjust for Beanstalk
-            "max_overflow": 10,     # Allow up to 10 connections to be created beyond pool_size
+            "pool_size": 10,        # Connection pool size for Elastic Beanstalk
+            "max_overflow": 20,     # Allow up to 20 connections to be created beyond pool_size
             "connect_args": {
                 "connect_timeout": 10  # 10 second connection timeout
             }
         }
-
-        # For AWS Lambda, adjust connection pooling
-        if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
-            # Lambda requires different connection pooling strategies
-            # Disable connection pooling for Lambda
-            engine_args["poolclass"] = None
 
         engine = create_engine(
             SQLALCHEMY_DATABASE_URL,

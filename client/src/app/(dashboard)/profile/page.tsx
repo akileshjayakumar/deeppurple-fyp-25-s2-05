@@ -110,6 +110,12 @@ export default function ProfilePage() {
       return;
     }
 
+    // Basic client-side validation
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters long");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -121,9 +127,13 @@ export default function ProfilePage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error changing password:", error);
-      toast.error("Failed to change password");
+
+      // Show specific error message from backend
+      const errorMessage =
+        error?.response?.data?.detail || "Failed to change password";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -246,6 +256,7 @@ export default function ProfilePage() {
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -255,7 +266,17 @@ export default function ProfilePage() {
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
+                    required
                   />
+                  <div className="text-sm text-muted-foreground">
+                    Password must contain:
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>At least 8 characters</li>
+                      <li>At least one uppercase letter</li>
+                      <li>At least one lowercase letter</li>
+                      <li>At least one number</li>
+                    </ul>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm-password">Confirm New Password</Label>
@@ -264,6 +285,7 @@ export default function ProfilePage() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
                   />
                 </div>
                 <Button type="submit" disabled={isLoading}>

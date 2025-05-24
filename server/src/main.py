@@ -38,70 +38,9 @@ async def lifespan(app: FastAPI):
         logger.debug(
             f"Attempting to connect to database with URL: {SQLALCHEMY_DATABASE_URL}")
 
-        # Create database tables - skip in Lambda environment
-        if not settings.IS_LAMBDA:
-            logger.info("Creating database tables...")
-            Base.metadata.create_all(bind=engine)
-            logger.debug("Database tables created successfully")
-        else:
-            logger.debug(
-                "Running in Lambda environment - skipping database table creation")
-
-        # Create initial admin user if environment variables are set and not in Lambda
-        admin_email = os.getenv("ADMIN_EMAIL")
-        admin_password = os.getenv("ADMIN_PASSWORD")
-
-        if admin_email and admin_password and not settings.IS_LAMBDA:
-            # Get a database session
-            from sqlalchemy.orm import sessionmaker
-            SessionLocal = sessionmaker(
-                autocommit=False, autoflush=False, bind=engine)
-            db = SessionLocal()
-
-            try:
-                # Create admin user
-                admin_user = create_admin_user(
-                    db=db,
-                    email=admin_email,
-                    password=admin_password
-                )
-                logger.info(f"Admin user setup completed for {admin_email}")
-            except Exception as e:
-                logger.error(f"Failed to create admin user: {str(e)}")
-            finally:
-                db.close()
-        else:
-            logger.info(
-                "Admin credentials not provided or running in Lambda, skipping admin user creation")
-
-        # Always create a test user for development, whether admin is created or not
-        try:
-            from sqlalchemy.orm import sessionmaker
-            SessionLocal = sessionmaker(
-                autocommit=False, autoflush=False, bind=engine)
-            db = SessionLocal()
-
-            from core.auth import get_password_hash
-            from models.models import User
-
-            test_user = db.query(User).filter(
-                User.email == "user@example.com").first()
-            if not test_user:
-                test_user = User(
-                    email="user@example.com",
-                    hashed_password=get_password_hash("password"),
-                    full_name="Test User",
-                    is_active=True
-                )
-                db.add(test_user)
-                db.commit()
-                logger.info("Test user created: user@example.com / password")
-            else:
-                logger.info("Test user already exists")
-
-            db.close()
-        except Exception as e:
-            logger.error(f"Failed to create test user: {str(e)}")
+        # Create database tables
+        Base.metadata.create_all(bind=engine)
+        logger.debug("Database tables created successfully")
 
     except Exception as e:
         logger.error(f"Error during database initialization: {str(e)}")
@@ -110,7 +49,7 @@ async def lifespan(app: FastAPI):
     # Clean up resources at shutdown if needed
     pass
 
-# Initialize FastAPI app with appropriate configuration for Lambda/Beanstalk
+# Initialize FastAPI app with appropriate configuration for Elastic Beanstalk
 root_path = "" if not settings.API_BASE_URL else settings.API_BASE_URL
 
 app = FastAPI(
@@ -209,7 +148,7 @@ async def root():
     """
     env_info = {
         "environment": settings.DEPLOYMENT_ENV,
-        "is_lambda": settings.IS_LAMBDA
+        "deployment_target": "elastic_beanstalk"
     }
 
     return {
@@ -245,7 +184,7 @@ async def health_check():
         "status": "ok",
         "database": db_status,
         "deployment_env": settings.DEPLOYMENT_ENV,
-        "is_lambda": settings.IS_LAMBDA
+        "deployment_target": "elastic_beanstalk"
     }
 
 if __name__ == "__main__":

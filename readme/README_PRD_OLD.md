@@ -64,6 +64,19 @@ This document provides a structured and detailed specification for the DeepPurpl
 
 ---
 
+## Technology Stack
+
+| Component            | Technology/Tool        | Purpose                                                      |
+| -------------------- | ---------------------- | ------------------------------------------------------------ |
+| Programming Language | Python                 | Core backend development language                            |
+| Web Framework        | FastAPI                | Backend API framework                                        |
+| LLM Integration      | LangChain + OpenAI API | Orchestration of LLM pipelines for analysis and Q\&A         |
+| Frontend             | React + TypeScript     | Web interface for user interaction                           |
+| Hosting/CI/CD        | AWS Amplify            | Frontend hosting and continuous integration/deployment       |
+| Backend Execution    | AWS Lambda             | Serverless compute for event-driven backend functions        |
+| Application Hosting  | AWS Elastic Beanstalk  | Managed deployment of backend APIs                           |
+| Database             | AWS RDS (PostgreSQL)   | Persistent storage for user sessions, insights, and metadata |
+
 ---
 
 ## Core Product Features

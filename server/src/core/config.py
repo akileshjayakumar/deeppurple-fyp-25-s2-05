@@ -21,7 +21,6 @@ class Settings(BaseSettings):
     # Deployment environment
     # development, staging, production
     DEPLOYMENT_ENV: str = os.getenv("DEPLOYMENT_ENV", "development")
-    IS_LAMBDA: bool = os.environ.get("AWS_LAMBDA_FUNCTION_NAME") is not None
 
     # Security settings
     SECRET_KEY: str = os.getenv(
@@ -39,10 +38,6 @@ class Settings(BaseSettings):
     DB_NAME: str = os.getenv("DB_NAME", "deeppurple")
     DB_PORT: str = os.getenv("DB_PORT", "5432")
 
-    # AWS RDS Proxy settings for Lambda
-    AWS_RDS_PROXY_ENDPOINT: Optional[str] = os.getenv(
-        "AWS_RDS_PROXY_ENDPOINT", None)
-
     # AWS settings
     AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID", "")
     AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY", "")
@@ -54,11 +49,7 @@ class Settings(BaseSettings):
         "AWS_S3_USE_LOCAL", "false").lower() in ("true", "1", "t")
     AWS_ENDPOINT_URL: Optional[str] = os.getenv("AWS_ENDPOINT_URL", None)
 
-    # Lambda settings
-    LAMBDA_FUNCTION_NAME: Optional[str] = os.getenv(
-        "AWS_LAMBDA_FUNCTION_NAME", None)
-
-    # API Base URL (for Lambda and Beanstalk)
+    # API Base URL (for Elastic Beanstalk deployment)
     API_BASE_URL: Optional[str] = os.getenv("API_BASE_URL", None)
 
     # OpenAI settings

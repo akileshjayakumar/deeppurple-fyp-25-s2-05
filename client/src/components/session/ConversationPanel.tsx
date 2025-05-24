@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Info, Upload, X, FileText } from "lucide-react";
+import { Send, Upload, X, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ConversationMessage } from "@/types";
 import { toast } from "sonner";
 import { analysisApi } from "@/lib/api";
@@ -169,14 +170,14 @@ export function ConversationPanel({ sessionId }: ConversationPanelProps) {
   };
 
   return (
-    <Card className="flex flex-col h-[500px]">
-      <CardHeader>
+    <Card className="flex flex-col h-[500px] border shadow-sm">
+      <CardHeader className="bg-white border-b">
         <CardTitle>Conversation</CardTitle>
         <CardDescription>
           Ask questions about the content in this session
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex-1 overflow-y-auto mb-4 space-y-4">
+      <CardContent className="flex-1 overflow-y-auto mb-4 space-y-4 p-4">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -184,43 +185,51 @@ export function ConversationPanel({ sessionId }: ConversationPanelProps) {
               message.role === "user" ? "justify-end" : "justify-start"
             }`}
           >
+            {message.role !== "user" && (
+              <Avatar
+                className={
+                  message.role === "assistant" ? "bg-purple-600" : "bg-gray-400"
+                }
+              >
+                <AvatarFallback>
+                  {message.role === "assistant" ? "AI" : "SYS"}
+                </AvatarFallback>
+              </Avatar>
+            )}
+
             <div
-              className={`max-w-[80%] rounded-lg p-3 ${
+              className={`mx-2 rounded-lg p-4 max-w-[80%] ${
                 message.role === "user"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-purple-600 text-white"
                   : message.role === "system"
-                  ? "bg-muted text-muted-foreground text-sm"
-                  : "bg-secondary"
+                  ? "bg-gray-100"
+                  : "bg-white border"
               }`}
             >
-              <div className="flex items-center space-x-2 mb-1">
-                {message.role === "user" ? (
-                  <User className="h-4 w-4" />
-                ) : message.role === "system" ? (
-                  <Info className="h-4 w-4" />
-                ) : (
-                  <Bot className="h-4 w-4" />
-                )}
-                <span className="font-medium text-xs">
-                  {message.role === "user"
-                    ? "You"
-                    : message.role === "system"
-                    ? "System"
-                    : "AI Assistant"}
-                </span>
+              <div className="whitespace-pre-wrap">{message.content}</div>
+              <div className="text-xs opacity-70 mt-2 text-right">
+                {new Date(message.created_at).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </div>
-              <p className="whitespace-pre-wrap">{message.content}</p>
             </div>
+
+            {message.role === "user" && (
+              <Avatar>
+                <AvatarFallback>U</AvatarFallback>
+              </Avatar>
+            )}
           </div>
         ))}
         <div ref={messagesEndRef} />
       </CardContent>
-      <CardFooter className="border-t pt-4">
+      <CardFooter className="border-t pt-4 bg-white">
         <div className="flex flex-col w-full space-y-2">
-          {/* File attachment UI similar to ChatGPT */}
+          {/* File attachment UI */}
           {selectedFile && (
-            <div className="flex items-center gap-2 p-2 border border-input rounded-md bg-muted/50">
-              <FileText className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2 p-2 border border-input rounded-md bg-gray-50">
+              <FileText className="h-4 w-4 text-gray-500" />
               <span className="text-sm truncate flex-1">
                 {selectedFile.name}
               </span>
@@ -247,13 +256,18 @@ export function ConversationPanel({ sessionId }: ConversationPanelProps) {
               className="flex-1 min-h-10 resize-none"
               disabled={isLoading}
             />
-            <div className="flex space-x-2">
+            <div className="flex flex-col space-y-2">
               <Button
                 size="icon"
                 onClick={handleSendMessage}
                 disabled={isLoading || (!inputValue.trim() && !selectedFile)}
+                className="bg-purple-600 hover:bg-purple-700"
               >
-                <Send className="h-4 w-4" />
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </Button>
               <Button
                 size="icon"

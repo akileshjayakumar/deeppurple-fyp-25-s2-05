@@ -134,6 +134,89 @@ async def change_password(
     return user
 
 
+@router.post("/change-password", response_model=schemas.UserResponse)
+async def change_password_post(
+    password_update: schemas.PasswordUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change user password (POST endpoint for frontend compatibility).
+
+    This endpoint provides secure password change functionality with proper validation:
+    - Verifies current password before allowing change
+    - Enforces password strength requirements
+    - Uses secure bcrypt hashing for storage
+    - Returns minimal error information for security
+    """
+    # Get user from database
+    user = db.query(User).filter(User.id == current_user.id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Verify current password
+    if not user.hashed_password or not verify_password(password_update.current_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+
+    # Validate new password strength
+    new_password = password_update.new_password
+
+    # Basic password validation
+    if len(new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long"
+        )
+
+    # Check for at least one uppercase letter
+    if not any(c.isupper() for c in new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one uppercase letter"
+        )
+
+    # Check for at least one lowercase letter
+    if not any(c.islower() for c in new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one lowercase letter"
+        )
+
+    # Check for at least one digit
+    if not any(c.isdigit() for c in new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain at least one number"
+        )
+
+    # Ensure new password is different from current password
+    if verify_password(new_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password"
+        )
+
+    # Update password with secure hashing
+    user.hashed_password = get_password_hash(new_password)
+
+    # Save changes
+    db.commit()
+    db.refresh(user)
+
+    # Log successful password change (without sensitive data)
+    from utils.logger import logger
+    logger.info(f"Password changed successfully for user ID: {user.id}")
+
+    return user
+
+
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user_account(
     current_user: User = Depends(get_current_active_user),

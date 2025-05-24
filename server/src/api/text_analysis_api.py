@@ -8,6 +8,11 @@ from pydantic import ValidationError
 import asyncio
 import io
 import tempfile
+import os
+import json
+import logging
+import datetime
+import magic
 
 from schemas import schemas
 from core.auth import get_current_active_user
@@ -16,8 +21,8 @@ from models.models import User, Session as SessionModel, File, FileContent, Insi
 from utils.text_analyzer import analyze_text, answer_question, answer_question_stream
 from utils.logger import logger
 from core.config import settings
-from api.files import upload_file_to_s3, parse_file_content, SUPPORTED_MIME_TYPES, MIME_TYPE_TO_FILE_TYPE
-import magic
+from utils.s3 import upload_file_to_s3
+from api.files import parse_file_content, SUPPORTED_MIME_TYPES, MIME_TYPE_TO_FILE_TYPE
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -923,7 +928,7 @@ async def ask_question_with_file(
 
         # Upload file to S3
         try:
-            s3_key = upload_file_to_s3(io.BytesIO(
+            s3_key = await upload_file_to_s3(io.BytesIO(
                 content), int(session_id), file.filename)
             logger.info(f"File uploaded to S3, key: {s3_key}")
 

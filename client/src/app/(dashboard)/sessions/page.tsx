@@ -252,7 +252,7 @@ export default function SessionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-6 rounded-lg shadow-sm border">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Sessions</h1>
           <p className="text-muted-foreground">
@@ -265,7 +265,7 @@ export default function SessionsPage() {
           onOpenChange={setIsNewSessionDialogOpen}
         >
           <DialogTrigger asChild>
-            <Button className="whitespace-nowrap">
+            <Button className="whitespace-nowrap bg-purple-600 hover:bg-purple-700">
               <PlusCircle className="mr-2 h-4 w-4" />
               New Session
             </Button>
@@ -292,7 +292,11 @@ export default function SessionsPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled={isCreatingSession}>
+                <Button
+                  type="submit"
+                  disabled={isCreatingSession}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
                   {isCreatingSession ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -308,18 +312,24 @@ export default function SessionsPage() {
         </Dialog>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 sm:justify-between">
+      <div className="flex flex-col sm:flex-row gap-2 sm:justify-between bg-white p-4 rounded-lg shadow-sm border">
         <div className="flex space-x-1">
           <Button
             variant={activeTab === "active" ? "default" : "outline"}
-            className="rounded-r-none"
+            className={`rounded-r-none ${
+              activeTab === "active" ? "bg-purple-600 hover:bg-purple-700" : ""
+            }`}
             onClick={() => handleTabChange("active")}
           >
             Active
           </Button>
           <Button
             variant={activeTab === "archived" ? "default" : "outline"}
-            className="rounded-l-none"
+            className={`rounded-l-none ${
+              activeTab === "archived"
+                ? "bg-purple-600 hover:bg-purple-700"
+                : ""
+            }`}
             onClick={() => handleTabChange("archived")}
           >
             Archived
@@ -375,7 +385,7 @@ export default function SessionsPage() {
                       e.preventDefault();
                       setSelectedEmotions([]);
                     }}
-                    className="justify-center text-primary"
+                    className="justify-center text-purple-600"
                   >
                     Clear Filters
                   </DropdownMenuItem>
@@ -387,11 +397,11 @@ export default function SessionsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex justify-center items-center py-12 bg-white rounded-lg shadow-sm border">
+          <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
         </div>
       ) : filteredSessions.length === 0 ? (
-        <div className="text-center py-12 border rounded-lg">
+        <div className="text-center py-12 border rounded-lg bg-white shadow-sm">
           <Inbox className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-1">No sessions found</h3>
           <p className="text-muted-foreground mb-4">
@@ -399,7 +409,10 @@ export default function SessionsPage() {
               ? "You don't have any archived sessions."
               : "Create your first session to get started."}
           </p>
-          <Button onClick={() => setIsNewSessionDialogOpen(true)}>
+          <Button
+            onClick={() => setIsNewSessionDialogOpen(true)}
+            className="bg-purple-600 hover:bg-purple-700"
+          >
             <PlusCircle className="h-4 w-4 mr-2" />
             Create New Session
           </Button>
@@ -407,8 +420,11 @@ export default function SessionsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredSessions.map((session) => (
-            <Card key={session.id} className="overflow-hidden">
-              <CardHeader className="pb-3">
+            <Card
+              key={session.id}
+              className="overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
+            >
+              <CardHeader className="pb-3 bg-white">
                 <div className="flex items-center justify-between">
                   <CardTitle className="truncate">{session.name}</CardTitle>
                   <DropdownMenu>
@@ -507,7 +523,7 @@ export default function SessionsPage() {
                         {session.insights.topics.slice(0, 3).map((topic) => (
                           <span
                             key={topic.id}
-                            className="bg-secondary text-secondary-foreground text-xs px-2 py-1 rounded-full"
+                            className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full"
                           >
                             {topic.name}
                           </span>
@@ -521,8 +537,12 @@ export default function SessionsPage() {
                     </div>
                   )}
               </CardContent>
-              <CardFooter className="pt-1">
-                <Button variant="outline" className="w-full" asChild>
+              <CardFooter className="pt-1 bg-gray-50">
+                <Button
+                  variant="outline"
+                  className="w-full hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200"
+                  asChild
+                >
                   <Link href={`/sessions/${session.id}`}>View Details</Link>
                 </Button>
               </CardFooter>
