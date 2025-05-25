@@ -57,21 +57,51 @@ export default function ProfilePage() {
     setIsLoading(true);
 
     try {
-      await userApi.updateProfile({ fullName });
-      toast.success("Profile updated successfully");
+      // Create FormData and ensure the name is properly set
+      const formData = new FormData();
+      formData.append("full_name", fullName);
+      
+      // Log what we're sending (for debugging)
+      console.log("Updating profile with name:", fullName);
+      
+      // Make the API request
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/users/profile`;
+      const response = await fetch(apiUrl, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`
+        },
+        body: formData
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update profile: ${response.status}`);
+      }
       
       // Fetch updated user data
       const updatedUserData = await authApi.getCurrentUser();
+      console.log("Updated user data:", updatedUserData);
+      
       if (updatedUserData) {
+        // Update local state first
+        setFullName(updatedUserData.full_name || "");
+        
         // Update the user context with the new data
-        // This will update the user data across the application
         if (typeof window !== "undefined") {
           // Force a refresh of the user context
           const event = new CustomEvent("user-updated", { detail: updatedUserData });
           window.dispatchEvent(event);
           
-          // Update local state
+          // Show success message
+          toast.success("Profile updated successfully");
+          
+          // Refresh the router
           router.refresh();
+          
+          // Force a reload to ensure all components are updated
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
         }
       }
     } catch (error) {

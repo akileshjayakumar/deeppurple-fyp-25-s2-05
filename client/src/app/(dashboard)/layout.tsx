@@ -55,6 +55,25 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
   const { user, logout } = useAuth();
+  
+  // Add a state to force re-render when user data changes
+  const [forceUpdate, setForceUpdate] = React.useState(0);
+  
+  // Listen for user-updated events
+  React.useEffect(() => {
+    const handleUserUpdated = () => {
+      // Force re-render of the component
+      setForceUpdate(prev => prev + 1);
+    };
+    
+    // Add event listener for custom user-updated event
+    window.addEventListener('user-updated', handleUserUpdated);
+    
+    // Cleanup event listener on unmount
+    return () => {
+      window.removeEventListener('user-updated', handleUserUpdated);
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
