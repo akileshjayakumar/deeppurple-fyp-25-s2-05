@@ -58,12 +58,12 @@ export default function SessionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
+  // Emotions filter removed as it was deemed unnecessary
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState("");
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
-  
+
   // Rename session state
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [sessionToRename, setSessionToRename] = useState<string | null>(null);
@@ -78,7 +78,7 @@ export default function SessionsPage() {
       const response = await sessionApi.getSessions({
         archived: showArchived,
         search: searchQuery === "" ? undefined : searchQuery,
-        emotion: selectedEmotions.length > 0 ? selectedEmotions[0] : undefined,
+        // Emotions filter removed
       });
 
       setSessions(response.sessions);
@@ -91,7 +91,7 @@ export default function SessionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [showArchived, searchQuery, selectedEmotions]);
+  }, [showArchived, searchQuery]);
 
   useEffect(() => {
     fetchSessions();
@@ -113,17 +113,10 @@ export default function SessionsPage() {
       );
     }
 
-    // Filter by emotions (if more than one is selected)
-    if (selectedEmotions.length > 1) {
-      filtered = filtered.filter((session) =>
-        selectedEmotions.includes(
-          session.insights?.emotion_summary?.dominant_emotion || ""
-        )
-      );
-    }
+    // Emotions filtering removed
 
     setFilteredSessions(filtered);
-  }, [sessions, searchQuery, selectedEmotions]);
+  }, [sessions, searchQuery]);
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,7 +166,9 @@ export default function SessionsPage() {
     try {
       await sessionApi.updateSession(sessionId, { is_archived: archive });
       toast.success(
-        archive ? "Session archived successfully" : "Session restored successfully"
+        archive
+          ? "Session archived successfully"
+          : "Session restored successfully"
       );
       fetchSessions();
     } catch (error) {
@@ -190,16 +185,18 @@ export default function SessionsPage() {
   // Handle renaming a session
   const handleRenameSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!sessionToRename || !newSessionNameForRename.trim()) {
       toast.error("Session name cannot be empty");
       return;
     }
-    
+
     setIsRenamingSession(true);
-    
+
     try {
-      await sessionApi.updateSession(sessionToRename, { name: newSessionNameForRename });
+      await sessionApi.updateSession(sessionToRename, {
+        name: newSessionNameForRename,
+      });
       toast.success("Session renamed successfully");
       setIsRenameDialogOpen(false);
       setSessionToRename(null);
@@ -212,7 +209,7 @@ export default function SessionsPage() {
       setIsRenamingSession(false);
     }
   };
-  
+
   // Open rename dialog with current session name
   const openRenameDialog = (session: SessionWithInsights) => {
     setSessionToRename(session.id);
@@ -220,13 +217,7 @@ export default function SessionsPage() {
     setIsRenameDialogOpen(true);
   };
 
-  const toggleEmotionFilter = (emotion: string) => {
-    setSelectedEmotions((prevEmotions) =>
-      prevEmotions.includes(emotion)
-        ? prevEmotions.filter((e) => e !== emotion)
-        : [...prevEmotions, emotion]
-    );
-  };
+  // Emotions filter toggle function removed
 
   const handleTabChange = (tab: "active" | "archived") => {
     setActiveTab(tab);
@@ -252,28 +243,9 @@ export default function SessionsPage() {
     return date.toLocaleDateString();
   };
 
-  const emotions = [
-    { name: "Joy", color: "bg-green-100 text-green-800" },
-    { name: "Sadness", color: "bg-blue-100 text-blue-800" },
-    { name: "Anger", color: "bg-red-100 text-red-800" },
-    { name: "Fear", color: "bg-purple-100 text-purple-800" },
-    { name: "Surprise", color: "bg-yellow-100 text-yellow-800" },
-    { name: "Disgust", color: "bg-orange-100 text-orange-800" },
-  ];
+  // Emotions array removed as it's no longer needed
 
-  const EmotionBadge = ({ emotion }: { emotion: string }) => {
-    const emotionConfig = emotions.find(
-      (e) => e.name.toLowerCase() === emotion.toLowerCase()
-    ) || { name: emotion, color: "bg-gray-100 text-gray-800" };
-
-    return (
-      <span
-        className={`${emotionConfig.color} text-xs font-medium px-2 py-1 rounded-full capitalize`}
-      >
-        {emotion}
-      </span>
-    );
-  };
+  // EmotionBadge component removed as it's no longer needed
 
   return (
     <div className="space-y-6">
@@ -373,51 +345,7 @@ export default function SessionsPage() {
             />
           </form>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-1 w-full sm:w-auto">
-                <Filter className="h-4 w-4" />
-                <span>Emotions</span>
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {emotions.map((emotion) => (
-                <DropdownMenuItem
-                  key={emotion.name}
-                  className="flex items-center gap-2"
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    toggleEmotionFilter(emotion.name.toLowerCase());
-                  }}
-                >
-                  <div
-                    className={`w-3 h-3 rounded-full ${
-                      emotion.color.split(" ")[0]
-                    }`}
-                  />
-                  <span>{emotion.name}</span>
-                  {selectedEmotions.includes(emotion.name.toLowerCase()) && (
-                    <span className="ml-auto">✓</span>
-                  )}
-                </DropdownMenuItem>
-              ))}
-              {selectedEmotions.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setSelectedEmotions([]);
-                    }}
-                    className="justify-center text-purple-600"
-                  >
-                    Clear Filters
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Emotions dropdown removed as it was deemed unnecessary */}
         </div>
       </div>
 
@@ -503,7 +431,9 @@ export default function SessionsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() => router.push(`/dashboard?session=${session.id}`)}
+                        onClick={() =>
+                          router.push(`/dashboard?session=${session.id}`)
+                        }
                       >
                         <FileText className="h-4 w-4 mr-2" />
                         View Details
@@ -517,10 +447,7 @@ export default function SessionsPage() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() =>
-                          handleArchiveSession(
-                            session.id,
-                            !session.is_archived
-                          )
+                          handleArchiveSession(session.id, !session.is_archived)
                         }
                       >
                         <Archive className="h-4 w-4 mr-2" />
@@ -542,7 +469,6 @@ export default function SessionsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="pb-3">
-
                 {session.insights?.topics &&
                   session.insights.topics.length > 0 && (
                     <div>
@@ -573,7 +499,9 @@ export default function SessionsPage() {
                   className="w-full hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200"
                   asChild
                 >
-                  <Link href={`/dashboard?session=${session.id}`}>View Details</Link>
+                  <Link href={`/dashboard?session=${session.id}`}>
+                    View Details
+                  </Link>
                 </Button>
               </CardFooter>
             </Card>
