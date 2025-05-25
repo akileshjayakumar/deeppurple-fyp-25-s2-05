@@ -95,31 +95,33 @@ Be objective, accurate, and comprehensive in your analysis. Your output will be 
 ```
                 
 Format your response as a JSON object with the following structure:
-{
-    "sentiment": {
-        "positive": float,  // Score between 0.0-1.0
-        "negative": float,  // Score between 0.0-1.0
-        "neutral": float,   // Score between 0.0-1.0
-        "overall": string   // "positive", "negative", or "neutral"
-    },
-    "emotions": {
-        "joy": float,       // Score between 0.0-1.0
-        "sadness": float,   // Score between 0.0-1.0
-        "anger": float,     // Score between 0.0-1.0
-        "fear": float,      // Score between 0.0-1.0
-        "surprise": float,  // Score between 0.0-1.0
-        "disgust": float,   // Score between 0.0-1.0
-        "dominant_emotion": string  // The emotion with highest contextual significance
-    },
+{{
+    "sentiment": {{
+        "positive": 0.5,  // Replace with actual score between 0.0-1.0
+        "negative": 0.5,  // Replace with actual score between 0.0-1.0
+        "neutral": 0.5,   // Replace with actual score between 0.0-1.0
+        "overall": "neutral"   // Replace with "positive", "negative", or "neutral"
+    }},
+    "emotions": {{
+        "joy": 0.5,       // Replace with actual score between 0.0-1.0
+        "sadness": 0.5,   // Replace with actual score between 0.0-1.0
+        "anger": 0.5,     // Replace with actual score between 0.0-1.0
+        "fear": 0.5,      // Replace with actual score between 0.0-1.0
+        "surprise": 0.5,  // Replace with actual score between 0.0-1.0
+        "disgust": 0.5,   // Replace with actual score between 0.0-1.0
+        "dominant_emotion": "joy"  // Replace with the emotion with highest contextual significance
+    }},
     "topics": [
-        {
-            "name": string,  // Concise topic label (2-4 words)
-            "keywords": [string, string, string]  // 3 representative keywords
-        },
-        // Additional topics...
+        {{
+            "name": "Example Topic",  // Replace with actual topic label (2-4 words)
+            "keywords": ["keyword1", "keyword2", "keyword3"]  // Replace with 3 representative keywords
+        }}
+        // Add more topics as needed, but ensure valid JSON format
     ],
-    "summary": string  // Concise summary of the text
-}
+    "summary": "This is a sample summary of the text."  // Replace with actual summary
+}}
+
+IMPORTANT: Your response must be valid JSON. Do not include any text outside the JSON object. Remove all comments and ensure proper JSON syntax.
 
 Ensure your response is valid JSON and follows this exact structure."""
             )
@@ -128,11 +130,48 @@ Ensure your response is valid JSON and follows this exact structure."""
         # Create chain and execute
         chain = prompt | llm | StrOutputParser()
         response = chain.invoke({"text": text[:10000]})  # Limit text length
-
-        # Parse the JSON response
-        results = json.loads(response)
-        logger.debug("Successfully parsed analysis response")
-        return results
+        
+        # Log the response for debugging
+        logger.debug(f"Raw response from OpenAI: {response[:500]}...")
+        
+        # Check if response is empty or not valid JSON
+        if not response or not response.strip():
+            logger.error("Empty response received from OpenAI")
+            return {
+                "sentiment": {"positive": 0.5, "negative": 0.5, "neutral": 0.5, "overall": "neutral"},
+                "emotions": {
+                    "joy": 0.0, "sadness": 0.0, "anger": 0.0, "fear": 0.0, 
+                    "surprise": 0.0, "disgust": 0.0, "dominant_emotion": "neutral"
+                },
+                "topics": [{"name": "No topics detected", "keywords": ["none", "none", "none"]}],
+                "summary": "Unable to analyze the provided text."
+            }
+        
+        try:
+            # Try to find JSON content in the response (in case there's extra text)
+            import re
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                results = json.loads(json_str)
+            else:
+                # If no JSON pattern found, try the original response
+                results = json.loads(response)
+                
+            logger.debug("Successfully parsed analysis response")
+            return results
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error: {str(e)}. Response: {response[:200]}...")
+            # Return a fallback response
+            return {
+                "sentiment": {"positive": 0.5, "negative": 0.5, "neutral": 0.5, "overall": "neutral"},
+                "emotions": {
+                    "joy": 0.0, "sadness": 0.0, "anger": 0.0, "fear": 0.0, 
+                    "surprise": 0.0, "disgust": 0.0, "dominant_emotion": "neutral"
+                },
+                "topics": [{"name": "Error in analysis", "keywords": ["error", "parsing", "failed"]}],
+                "summary": "There was an error analyzing the text. Please try again with different content."
+            }
 
     except Exception as e:
         logger.error(f"Error during text analysis: {str(e)}")
