@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   MessageSquare,
   PlusCircle,
@@ -13,6 +13,8 @@ import {
   Loader2,
   X,
   FileText,
+  FileDown,
+  ChevronDown,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -38,7 +40,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { sessionApi, analysisApi } from "@/lib/api";
+import { sessionApi, analysisApi, fileApi } from "@/lib/api";
 
 interface Message {
   id: string;
@@ -47,8 +49,10 @@ interface Message {
   timestamp: Date;
 }
 
-export default function Dashboard() {
+// This is the main dashboard component that will be wrapped with Suspense
+function DashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [newSessionName, setNewSessionName] = useState("");
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -69,11 +73,119 @@ export default function Dashboard() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+  
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        exportDropdownRef.current &&
+        !exportDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsExportDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Load session from URL query parameter
+  useEffect(() => {
+    const sessionId = searchParams.get('session');
+    console.log('Session ID from URL:', sessionId);
+    if (sessionId) {
+      loadExistingSession(sessionId);
+    } else {
+      // Reset to default state when no session is selected
+      setCurrentSessionId(null);
+      setMessages([
+        {
+          id: "welcome-message",
+          content: "Welcome to DeepPurple! How can I help you with sentiment analysis today?",
+          role: "system",
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  }, [searchParams]);
+  
+  // Function to load an existing session
+  const loadExistingSession = useCallback(async (sessionId: string) => {
+    try {
+      setIsLoading(true);
+      console.log('Loading session:', sessionId);
+      
+      // Fetch session details
+      const session = await sessionApi.getSessionById(sessionId);
+      console.log('Session details loaded:', session);
+      setCurrentSessionId(sessionId);
+      
+      // Fetch session messages
+      try {
+        console.log('Fetching messages for session:', sessionId);
+        const messageHistory = await sessionApi.getSessionMessages(sessionId);
+        console.log('Message history loaded:', messageHistory);
+        
+        // Always include the welcome message
+        const formattedMessages: Message[] = [
+          {
+            id: "welcome-message",
+            content: "Welcome to DeepPurple! How can I help you with sentiment analysis today?",
+            role: "system",
+            timestamp: new Date(),
+          }
+        ];
+        
+        // Add message history if available
+        if (messageHistory && messageHistory.length > 0) {
+          // Add all messages from history - each message contains both question and answer
+          messageHistory.forEach((msg: any) => {
+            // First add the user question
+            if (msg.question_text) {
+              formattedMessages.push({
+                id: `question-${msg.id}`,
+                content: msg.question_text,
+                role: "user",
+                timestamp: new Date(msg.created_at),
+              });
+            }
+            
+            // Then add the AI response if it exists
+            if (msg.answer_text) {
+              formattedMessages.push({
+                id: `answer-${msg.id}`,
+                content: msg.answer_text,
+                role: "assistant",
+                timestamp: new Date(msg.answered_at || msg.created_at),
+              });
+            }
+          });
+        }
+        
+        console.log('Formatted messages:', formattedMessages);
+        setMessages(formattedMessages);
+      } catch (error) {
+        console.error("Error loading messages:", error);
+        toast.error("Failed to load conversation history");
+      }
+      
+      toast.success(`Loaded session: ${session.name}`);
+    } catch (error) {
+      console.error("Error loading session:", error);
+      toast.error("Failed to load session");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,8 +204,8 @@ export default function Dashboard() {
       setIsDialogOpen(false);
       setCurrentSessionId(session.id);
 
-      // Navigate to the new session
-      router.push(`/sessions/${session.id}`);
+      // Navigate to the dashboard with the new session ID
+      router.push(`/dashboard?session=${session.id}`);
     } catch (error) {
       console.error("Error creating session:", error);
       toast.error("Failed to create session");
@@ -145,84 +257,121 @@ export default function Dashboard() {
     // Save current input and file for processing
     const currentInput = inputValue;
     const currentFile = selectedFile;
-
-    // Clear selected file
     setSelectedFile(null);
-
-    // Create placeholder for assistant response
-    const assistantMessageId = `assistant-${Date.now()}`;
+    
+    // Create a placeholder message for streaming response
+    const aiMessageId = `ai-${Date.now()}`;
     const placeholderMessage: Message = {
-      id: assistantMessageId,
-      content: currentFile ? "Analyzing your file..." : "",
+      id: aiMessageId,
+      content: "", // Empty content that will be filled as tokens arrive
       role: "assistant",
       timestamp: new Date(),
     };
-
+    
+    // Add the placeholder message
     setMessages((prev) => [...prev, placeholderMessage]);
-
+    
     try {
-      if (currentFile && sessionId) {
-        // Ensure sessionId is not null
-        // Handle file upload with question
-        const response = await analysisApi.askQuestionWithFile(
-          sessionId,
-          currentInput,
-          currentFile
-        );
-
-        // Update the message with the response
-        setMessages((prevMessages) =>
-          prevMessages.map((msg) =>
-            msg.id === assistantMessageId
-              ? {
-                  ...msg,
-                  content:
-                    response?.answer ||
-                    "I've analyzed your file but couldn't generate a response.",
-                }
-              : msg
-          )
-        );
-      } else if (sessionId) {
-        // Ensure sessionId is not null
-        // Use streaming API for plain questions
-        await analysisApi.streamQuestion(sessionId, currentInput, (token) => {
-          // Update message content with each new token
-          setMessages((prevMessages) =>
-            prevMessages.map((msg) =>
-              msg.id === assistantMessageId
-                ? { ...msg, content: msg.content + token }
+      // Handle file upload first if there's a file
+      if (currentFile) {
+        try {
+          // Upload the file and stream the response
+          toast.info("Uploading and analyzing file...");
+          
+          // Define handlers for streaming and upload progress
+          let accumulatedResponse = "";
+          
+          const handleToken = (token: string) => {
+            accumulatedResponse += token;
+            
+            // Update the message with the accumulated response
+            setMessages((prev) => 
+              prev.map(msg => 
+                msg.id === aiMessageId 
+                  ? { ...msg, content: accumulatedResponse } 
+                  : msg
+              )
+            );
+          };
+          
+          const handleUploadProgress = (progress: number) => {
+            // You could use this to show a progress indicator
+            console.log(`Upload progress: ${progress}%`);
+          };
+          
+          // Use the streaming version for file uploads
+          await analysisApi.streamQuestionWithFile(
+            sessionId as string,
+            currentInput || "Please analyze this file",
+            currentFile,
+            handleToken,
+            handleUploadProgress
+          );
+          
+          toast.success("File analyzed successfully");
+        } catch (uploadError) {
+          console.error("Error uploading and analyzing file:", uploadError);
+          toast.error("Failed to process file");
+          
+          // Update placeholder with error message
+          setMessages((prev) => 
+            prev.map(msg => 
+              msg.id === aiMessageId 
+                ? { ...msg, content: "Sorry, I couldn't process that file. Please try again." } 
                 : msg
             )
           );
-        });
+          
+          setIsLoading(false);
+          return;
+        }
       } else {
-        throw new Error("Session ID is required but not available");
+        // For regular questions, use streaming API
+        // Define a callback function to handle incoming tokens
+        let accumulatedResponse = "";
+        
+        const handleToken = (token: string) => {
+          accumulatedResponse += token;
+          
+          // Update the message with the accumulated response
+          setMessages((prev) => 
+            prev.map(msg => 
+              msg.id === aiMessageId 
+                ? { ...msg, content: accumulatedResponse } 
+                : msg
+            )
+          );
+        };
+        
+        // Use the streaming API
+        await analysisApi.streamQuestion(
+          sessionId as string,
+          currentInput,
+          handleToken
+        );
       }
     } catch (error) {
-      console.error("Error processing question:", error);
-      // Show error in the UI
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) =>
-          msg.id === assistantMessageId
-            ? {
-                ...msg,
-                content:
-                  "Sorry, I encountered an error while processing your request. Please try again.",
-              }
-            : msg
-        )
-      );
+      console.error("Error sending message:", error);
+      toast.error("Failed to get a response");
+
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        content:
+          "I'm sorry, I encountered an error processing your request. Please try again.",
+        role: "assistant",
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+    if (e.target.files && e.target.files.length > 0) {
       setSelectedFile(e.target.files[0]);
-      // Clear the file input value to allow selecting the same file again
-      e.target.value = "";
     }
   };
 
@@ -234,7 +383,7 @@ export default function Dashboard() {
   };
 
   const handleNewChat = () => {
-    setCurrentSessionId(null);
+    // Reset the chat state
     setMessages([
       {
         id: "welcome-message",
@@ -246,20 +395,121 @@ export default function Dashboard() {
     ]);
     setInputValue("");
     setSelectedFile(null);
+    setCurrentSessionId(null);
+  };
+  
+  // Handle export functionality
+  const handleExportReport = async (format: "markdown" | "pdf" | "csv") => {
+    if (!currentSessionId) {
+      toast.error("No active session to export");
+      return;
+    }
+
+    try {
+      // Set loading state if needed
+      const response = await fetch(
+        `/api/sessions/${currentSessionId}/export?format=${format}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Export failed with status: ${response.status}`);
+      }
+
+      // Handle different formats
+      if (format === "markdown" || format === "csv") {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `session-export-${format === "markdown" ? "md" : "csv"}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else if (format === "pdf") {
+        // For PDF, we might need to handle differently
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, "_blank");
+      }
+
+      toast.success(`Exported session as ${format.toUpperCase()}`);
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Failed to export session");
+    } finally {
+      // Reset loading state if needed
+      setIsExportDropdownOpen(false);
+    }
   };
 
+  // Console log for debugging during build
+  console.log('Rendering dashboard content, sessionId:', currentSessionId);
+  
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
       {/* Chat Header */}
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">
-          {currentSessionId ? "Current Conversation" : "New Conversation"}
-        </h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleNewChat}>
-            <PlusCircle className="h-4 w-4 mr-2" />
-            New Chat
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleNewChat}
+            title="New Chat"
+          >
+            <PlusCircle className="h-5 w-5" />
           </Button>
+          <h1 className="text-xl font-bold">
+            {currentSessionId ? "Current Conversation" : "New Conversation"}
+          </h1>
+        </div>
+        
+        <div className="flex gap-2">
+          {/* Export Button */}
+          {currentSessionId && (
+            <div className="relative" ref={exportDropdownRef}>
+              <Button
+                variant="outline"
+                className="flex items-center gap-2"
+                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+              >
+                <FileDown className="h-4 w-4" />
+                Export
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+              {isExportDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white border rounded-md shadow-lg z-10">
+                  <div className="py-1">
+                    <button
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                      onClick={() => handleExportReport("markdown")}
+                    >
+                      Export as Markdown
+                    </button>
+                    <button
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                      onClick={() => handleExportReport("pdf")}
+                    >
+                      Export as PDF
+                    </button>
+                    <button
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                      onClick={() => handleExportReport("csv")}
+                    >
+                      Export as CSV
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -419,5 +669,14 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Export a wrapper component with Suspense boundary
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }

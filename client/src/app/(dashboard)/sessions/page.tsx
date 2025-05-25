@@ -63,6 +63,12 @@ export default function SessionsPage() {
   const [newSessionName, setNewSessionName] = useState("");
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [activeTab, setActiveTab] = useState<"active" | "archived">("active");
+  
+  // Rename session state
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [sessionToRename, setSessionToRename] = useState<string | null>(null);
+  const [newSessionNameForRename, setNewSessionNameForRename] = useState("");
+  const [isRenamingSession, setIsRenamingSession] = useState(false);
 
   // Fetch sessions
   const fetchSessions = useCallback(async () => {
@@ -135,8 +141,8 @@ export default function SessionsPage() {
       setNewSessionName("");
       setIsNewSessionDialogOpen(false);
 
-      // Navigate to the new session
-      router.push(`/sessions/${session.id}`);
+      // Navigate to the dashboard with the new session ID
+      router.push(`/dashboard?session=${session.id}`);
     } catch (error) {
       console.error("Error creating session:", error);
       toast.error("Failed to create session");
@@ -167,32 +173,51 @@ export default function SessionsPage() {
     try {
       await sessionApi.updateSession(sessionId, { is_archived: archive });
       toast.success(
-        archive
-          ? "Session archived successfully"
-          : "Session unarchived successfully"
+        archive ? "Session archived successfully" : "Session restored successfully"
       );
-
-      // Update the sessions list
-      setSessions((prevSessions) =>
-        prevSessions.map((session) =>
-          session.id === sessionId
-            ? { ...session, is_archived: archive }
-            : session
-        )
-      );
-
-      // Remove from filtered list if no longer matches criteria
-      if (showArchived !== archive) {
-        setFilteredSessions((prevSessions) =>
-          prevSessions.filter((session) => session.id !== sessionId)
-        );
-      }
+      fetchSessions();
     } catch (error) {
-      console.error("Error archiving session:", error);
+      console.error(
+        archive ? "Error archiving session:" : "Error restoring session:",
+        error
+      );
       toast.error(
-        archive ? "Failed to archive session" : "Failed to unarchive session"
+        archive ? "Failed to archive session" : "Failed to restore session"
       );
     }
+  };
+
+  // Handle renaming a session
+  const handleRenameSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!sessionToRename || !newSessionNameForRename.trim()) {
+      toast.error("Session name cannot be empty");
+      return;
+    }
+    
+    setIsRenamingSession(true);
+    
+    try {
+      await sessionApi.updateSession(sessionToRename, { name: newSessionNameForRename });
+      toast.success("Session renamed successfully");
+      setIsRenameDialogOpen(false);
+      setSessionToRename(null);
+      setNewSessionNameForRename("");
+      fetchSessions();
+    } catch (error) {
+      console.error("Error renaming session:", error);
+      toast.error("Failed to rename session");
+    } finally {
+      setIsRenamingSession(false);
+    }
+  };
+  
+  // Open rename dialog with current session name
+  const openRenameDialog = (session: SessionWithInsights) => {
+    setSessionToRename(session.id);
+    setNewSessionNameForRename(session.name);
+    setIsRenameDialogOpen(true);
   };
 
   const toggleEmotionFilter = (emotion: string) => {
@@ -396,6 +421,49 @@ export default function SessionsPage() {
         </div>
       </div>
 
+      {/* Rename Session Dialog */}
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Session</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this session.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleRenameSession}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="rename-session-name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="rename-session-name"
+                  value={newSessionNameForRename}
+                  onChange={(e) => setNewSessionNameForRename(e.target.value)}
+                  className="col-span-3"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsRenameDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isRenamingSession}>
+                {isRenamingSession && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {isLoading ? (
         <div className="flex justify-center items-center py-12 bg-white rounded-lg shadow-sm border">
           <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
@@ -434,24 +502,33 @@ export default function SessionsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/sessions/${session.id}`}>
-                          <FileText className="h-4 w-4 mr-2" />
-                          View Details
-                        </Link>
+                      <DropdownMenuItem
+                        onClick={() => router.push(`/dashboard?session=${session.id}`)}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => openRenameDialog(session)}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Rename
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() =>
-                          handleArchiveSession(session.id, !session.is_archived)
+                          handleArchiveSession(
+                            session.id,
+                            !session.is_archived
+                          )
                         }
                       >
                         <Archive className="h-4 w-4 mr-2" />
                         {session.is_archived ? "Unarchive" : "Archive"}
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
                         onClick={() => handleDeleteSession(session.id)}
+                        className="text-red-600 focus:text-red-600"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete
@@ -465,53 +542,6 @@ export default function SessionsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="pb-3">
-                <div className="flex flex-wrap gap-2 mb-2">
-                  <div className="flex-1">
-                    <div className="text-xs text-muted-foreground mb-1">
-                      Dominant Emotion
-                    </div>
-                    <div>
-                      {session.insights?.emotion_summary?.dominant_emotion ? (
-                        <EmotionBadge
-                          emotion={
-                            session.insights.emotion_summary.dominant_emotion
-                          }
-                        />
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          No data
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="text-xs text-muted-foreground mb-1">
-                      Overall Sentiment
-                    </div>
-                    <div>
-                      {session.insights?.sentiment_summary?.overall ? (
-                        <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full capitalize ${
-                            session.insights.sentiment_summary.overall ===
-                            "positive"
-                              ? "bg-green-100 text-green-800"
-                              : session.insights.sentiment_summary.overall ===
-                                "negative"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {session.insights.sentiment_summary.overall}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          No data
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
 
                 {session.insights?.topics &&
                   session.insights.topics.length > 0 && (
@@ -543,7 +573,7 @@ export default function SessionsPage() {
                   className="w-full hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200"
                   asChild
                 >
-                  <Link href={`/sessions/${session.id}`}>View Details</Link>
+                  <Link href={`/dashboard?session=${session.id}`}>View Details</Link>
                 </Button>
               </CardFooter>
             </Card>

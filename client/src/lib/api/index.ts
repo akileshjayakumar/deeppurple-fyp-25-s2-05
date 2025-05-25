@@ -323,6 +323,59 @@ export const analysisApi = {
       return false;
     }
   },
+  
+  // Stream version for file uploads with token-by-token responses
+  streamQuestionWithFile: async (
+    sessionId: string,
+    question: string,
+    file: File,
+    onTokenCallback: (token: string) => void,
+    onUploadProgress?: (progress: number) => void
+  ) => {
+    try {
+      console.log("Starting file upload with streaming response:", {
+        sessionId,
+        question,
+        fileName: file.name,
+      });
+      
+      // First, upload the file and get initial processing done
+      onTokenCallback("Processing your file... ");
+      
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("session_id", sessionId);
+      formData.append("question", question);
+      
+      // Upload the file first (this part can't be streamed)
+      const uploadResponse = await api.post(
+        "/analysis/question/with-file",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          onUploadProgress: (progressEvent) => {
+            if (onUploadProgress && progressEvent.total) {
+              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              onUploadProgress(percentCompleted);
+            }
+          },
+        }
+      );
+      
+      // Once file is uploaded, stream the response
+      onTokenCallback("\n\n");
+      onTokenCallback(uploadResponse.data.answer);
+      
+      return true;
+    } catch (error) {
+      console.error("Error in streamQuestionWithFile API call:", error);
+      onTokenCallback("\nError: Failed to process file and stream response. Please try again.");
+      return false;
+    }
+  },
 };
 
 // File APIs
