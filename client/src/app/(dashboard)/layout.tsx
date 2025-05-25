@@ -191,7 +191,11 @@ export default function DashboardLayout({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Avatar>
-                  <AvatarImage src={user?.profile_picture || ""} />
+                  <AvatarImage 
+                    src={user?.profile_picture ? 
+                      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/users/profile-picture/${user.profile_picture}` : 
+                      ""} 
+                  />
                   <AvatarFallback className="bg-purple-100 text-purple-700">
                     {getInitials()}
                   </AvatarFallback>
@@ -226,7 +230,11 @@ export default function DashboardLayout({
           <header className="hidden md:flex items-center justify-end p-4 border-b bg-white shadow-sm">
             <div className="flex items-center">
               <Avatar className="cursor-pointer">
-                <AvatarImage src={user?.profile_picture || ""} />
+                <AvatarImage 
+                  src={user?.profile_picture ? 
+                    `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/users/profile-picture/${user.profile_picture}` : 
+                    ""} 
+                />
                 <AvatarFallback className="bg-purple-100 text-purple-700">
                   {getInitials()}
                 </AvatarFallback>

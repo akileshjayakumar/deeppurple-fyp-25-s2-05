@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { userApi } from "@/lib/api";
+import { userApi, authApi } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -59,7 +59,21 @@ export default function ProfilePage() {
     try {
       await userApi.updateProfile({ fullName });
       toast.success("Profile updated successfully");
-      router.refresh();
+      
+      // Fetch updated user data
+      const updatedUserData = await authApi.getCurrentUser();
+      if (updatedUserData) {
+        // Update the user context with the new data
+        // This will update the user data across the application
+        if (typeof window !== "undefined") {
+          // Force a refresh of the user context
+          const event = new CustomEvent("user-updated", { detail: updatedUserData });
+          window.dispatchEvent(event);
+          
+          // Update local state
+          router.refresh();
+        }
+      }
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile");
@@ -92,8 +106,21 @@ export default function ProfilePage() {
     try {
       await userApi.updateProfile({ profilePicture: file });
       toast.success("Profile picture updated successfully");
-      // Force reload to see the new image
-      window.location.reload();
+      
+      // Fetch updated user data
+      const updatedUserData = await authApi.getCurrentUser();
+      if (updatedUserData) {
+        // Update the user context with the new data
+        // This will update the user data across the application
+        if (typeof window !== "undefined") {
+          // Force a refresh of the user context
+          const event = new CustomEvent("user-updated", { detail: updatedUserData });
+          window.dispatchEvent(event);
+          
+          // Update local state
+          router.refresh();
+        }
+      }
     } catch (error) {
       console.error("Error updating profile picture:", error);
       toast.error("Failed to update profile picture");
@@ -181,8 +208,12 @@ export default function ProfilePage() {
             <div className="space-y-6">
               <div className="flex flex-col items-center sm:flex-row sm:items-start gap-4">
                 <div className="relative group">
-                  <Avatar className="h-24 w-24">
-                    <AvatarImage src={user?.profile_picture || ""} />
+                  <Avatar className="h-24 w-24 mx-auto">
+                    <AvatarImage 
+                      src={user?.profile_picture ? 
+                        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/users/profile-picture/${user.profile_picture}` : 
+                        ""} 
+                    />
                     <AvatarFallback className="text-2xl">
                       {getInitials()}
                     </AvatarFallback>

@@ -30,6 +30,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const isAuthenticated = !!user;
+  
+  // Listen for user-updated events to update the user context
+  useEffect(() => {
+    const handleUserUpdated = (event: CustomEvent) => {
+      if (event.detail) {
+        setUser(event.detail);
+      }
+    };
+    
+    // Add event listener for custom user-updated event
+    window.addEventListener('user-updated', handleUserUpdated as EventListener);
+    
+    // Cleanup event listener on unmount
+    return () => {
+      window.removeEventListener('user-updated', handleUserUpdated as EventListener);
+    };
+  }, []);
 
   // Check if user is authenticated on component mount
   useEffect(() => {

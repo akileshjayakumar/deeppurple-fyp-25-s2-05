@@ -6,7 +6,10 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { GoogleLogin } from "@react-oauth/google";
 
+// UI Components
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -17,16 +20,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { useAuth } from "@/hooks/useAuth";
-import { GoogleLogin } from "@react-oauth/google";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -39,7 +32,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const { login, googleLogin, isLoading } = useAuth();
-  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -50,137 +43,163 @@ export default function LoginPage() {
   });
 
   async function onSubmit(data: LoginFormValues) {
-    setError(null);
     try {
       await login(data.email, data.password);
       toast.success("Login successful!");
     } catch (error: unknown) {
       console.error("Login error:", error);
-      const errorMessage =
-        error &&
-        typeof error === "object" &&
-        "response" in error &&
-        error.response &&
-        typeof error.response === "object" &&
-        "data" in error.response &&
-        error.response.data &&
-        typeof error.response.data === "object" &&
-        "detail" in error.response.data
-          ? String(error.response.data.detail)
-          : "Login failed. Please check your credentials.";
-      setError(errorMessage);
-      toast.error(errorMessage);
+      
+      // Simple error message with animation
+      toast.error("Invalid credentials. Please check your email and password.", {
+        duration: 3000,
+        className: "animate-in fade-in-50 duration-300",
+      });
+      
+      // Shake animation for form
+      const formElement = document.querySelector("form");
+      if (formElement) {
+        formElement.classList.add("animate-shake");
+        setTimeout(() => {
+          formElement.classList.remove("animate-shake");
+        }, 500);
+      }
+      
+      // Focus on the email field for better UX
+      form.setFocus("email");
     }
   }
 
-  async function onGoogleSubmit (credentialResponse: any) {
-    setError(null);
+  async function onGoogleSubmit(credentialResponse: any) {
     try {
       await googleLogin(credentialResponse.credential);
       toast.success("Google login successful!");
     } catch (error: unknown) {
       console.error("Google login error:", error);
-      const errorMessage =
-        error &&
-        typeof error === "object" &&
-        "response" in error &&
-        error.response &&
-        typeof error.response === "object" &&
-        "data" in error.response &&
-        error.response.data &&
-        typeof error.response.data === "object" &&
-        "detail" in error.response.data
-          ? String(error.response.data.detail)
-          : "Google login failed. Please try again.";
-      setError(errorMessage);
-      toast.error(errorMessage);
+      
+      toast.error("Google login failed. Please try again or use email/password.", {
+        duration: 3000,
+        className: "animate-in fade-in-50 duration-300",
+      });
     }
-  };
+  }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">
-            Login to DeepPurple
-          </CardTitle>
-          <CardDescription>
-            Enter your credentials to access your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md mb-4">
-              {error}
-            </div>
-          )}
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input placeholder="email@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
-              </Button>
-            </form>
-          </Form>
+    <div className="w-full max-w-md transition-all duration-300 ease-in-out">
+      {/* Main heading */}
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-semibold text-gray-900">Welcome back</h1>
+        <p className="text-gray-600 mt-2">Sign in to your DeepPurple account</p>
+      </div>
 
-          {/* Google Login */}
-          <div className="flex items-center my-4">
-          <div className="flex-grow border-t border-gray-300"></div>
-          <span className="mx-2 text-muted-foreground text-xs">or</span>
-          <div className="flex-grow border-t border-gray-300"></div>
-          </div>
+      {/* Login form */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-4">
+        <Form {...form}>
+          <form 
+            onSubmit={form.handleSubmit(onSubmit)} 
+            className="space-y-4"
+            style={{ transition: "all 0.2s ease" }}
+          >
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-gray-700">Email address</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="email@example.com" 
+                      className="h-10 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex justify-between items-center">
+                    <FormLabel className="text-gray-700">Password</FormLabel>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-xs text-primary hover:underline focus:outline-none"
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                  <FormControl>
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="h-10 focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage className="text-xs" />
+                </FormItem>
+              )}
+            />
+            <Button 
+              type="submit" 
+              className="w-full h-10 font-medium transition-all duration-200 hover:shadow-md"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Signing in...
+                </span>
+              ) : (
+                "Sign in"
+              )}
+            </Button>
+          </form>
+        </Form>
 
+        {/* Divider */}
+        <div className="flex items-center my-6">
+          <div className="flex-grow border-t border-gray-200"></div>
+          <span className="mx-3 text-gray-500 text-sm">or</span>
+          <div className="flex-grow border-t border-gray-200"></div>
+        </div>
+
+        {/* Google Login */}
+        <div className="flex justify-center">
           <GoogleLogin
             onSuccess={onGoogleSubmit}
             onError={() => {
-              console.log("Login Failed");
-              toast.error("Google login failed. Please try again.");
+              toast.error("Google login failed. Please try again.", {
+                duration: 3000,
+                className: "animate-in fade-in-50 duration-300",
+              });
             }}
+            shape="rectangular"
+            text="signin_with"
+            size="large"
+            theme="outline"
+            logo_alignment="center"
             containerProps={{ style: { width: "100%" } }}
           />
+        </div>
+      </div>
 
-        </CardContent>
-        <CardFooter className="flex justify-center flex-col space-y-2">
-          <div className="text-sm text-center text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link
-              href="/signup"
-              className="underline underline-offset-4 hover:text-primary"
-            >
-              Sign up
-            </Link>
-          </div>
-        </CardFooter>
-      </Card>
+      {/* Sign up link */}
+      <div className="text-center text-sm text-gray-600">
+        Don't have an account?{" "}
+        <Link
+          href="/signup"
+          className="text-primary font-medium hover:underline transition-colors"
+        >
+          Sign up
+        </Link>
+      </div>
     </div>
   );
 }

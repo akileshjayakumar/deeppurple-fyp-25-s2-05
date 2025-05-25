@@ -6,44 +6,35 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <div className="hidden md:flex md:w-1/2 bg-primary p-6 text-white flex-col justify-between">
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* Header with logo */}
+      <header className="w-full py-6 flex justify-center border-b border-gray-100 bg-white">
         <div className="flex items-center gap-2">
-          <div className="bg-white text-primary font-bold rounded-full w-10 h-10 flex items-center justify-center">
-            DP
-          </div>
-          <h1 className="text-2xl font-bold">DeepPurple</h1>
-        </div>
-
-        <div className="py-12">
-          <h2 className="text-3xl font-bold mb-4">Turn words into insights</h2>
-          <p className="text-lg opacity-90">
-            Analyze client communications, decipher emotions, and understand
-            sentiment with our powerful AI platform.
-          </p>
-        </div>
-
-        <div className="text-sm opacity-75">
-          © {new Date().getFullYear()} DeepPurple. All rights reserved.
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col">
-        <div className="md:hidden p-4 flex items-center gap-2">
           <div className="bg-primary text-white font-bold rounded-full w-8 h-8 flex items-center justify-center">
             DP
           </div>
-          <h1 className="text-xl font-bold">DeepPurple</h1>
+          <h1 className="text-xl font-medium text-gray-900">DeepPurple</h1>
         </div>
+      </header>
 
-        <main className="flex-1 flex items-center justify-center">
+      {/* Main content */}
+      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8">
+        <div className="w-full max-w-md">
           {children}
-        </main>
-
-        <div className="md:hidden p-4 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} DeepPurple. All rights reserved.
         </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="py-4 text-center text-sm text-gray-500">
+        <div className="max-w-md mx-auto px-4">
+          <p>© {new Date().getFullYear()} DeepPurple. All rights reserved.</p>
+          <div className="mt-2 flex justify-center space-x-4">
+            <a href="#" className="hover:text-gray-700 transition-colors">Terms</a>
+            <a href="#" className="hover:text-gray-700 transition-colors">Privacy</a>
+            <a href="#" className="hover:text-gray-700 transition-colors">Help</a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
