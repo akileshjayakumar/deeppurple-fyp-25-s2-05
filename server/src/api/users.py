@@ -236,11 +236,13 @@ async def delete_user_account(
     return None
 
 
+from fastapi import Form
+
 @router.patch("/profile", response_model=schemas.UserResponse)
 async def update_user_profile_patch(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
-    full_name: str = None,
+    full_name: str = Form(default=None),
     profile_picture: UploadFile = None
 ):
     """
@@ -256,10 +258,17 @@ async def update_user_profile_patch(
     # Get user from database
     user = db.query(User).filter(User.id == current_user.id).first()
     
-    # Log the current state
-    logger.info(f"Updating user profile for user_id={current_user.id}")
-    logger.info(f"Current profile: full_name='{user.full_name}', profile_picture='{user.profile_picture}'")
-    logger.info(f"Update request: full_name='{full_name}', profile_picture={profile_picture is not None}")
+    # Enhanced debugging logs
+    logger.info(f"DEBUG - Updating user profile for user_id={current_user.id}")
+    logger.info(f"DEBUG - Current profile: full_name='{user.full_name}', profile_picture='{user.profile_picture}'")
+    logger.info(f"DEBUG - Update request parameters: full_name='{full_name}' (type: {type(full_name)}), profile_picture={profile_picture is not None}")
+    
+    # Log the received parameters
+    logger.info(f"DEBUG - Received full_name parameter: '{full_name}'")
+    if profile_picture:
+        logger.info(f"DEBUG - Received profile_picture: {profile_picture.filename}")
+    else:
+        logger.info("DEBUG - No profile picture received")
 
     # Update full name if provided
     if full_name:
