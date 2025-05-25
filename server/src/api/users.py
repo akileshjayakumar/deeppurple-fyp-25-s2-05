@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File as FastAPIFile
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File as FastAPIFile, Response
 from sqlalchemy.orm import Session
 import magic
 import uuid
@@ -87,10 +87,11 @@ async def update_profile_picture(
     file.filename = s3_key
 
     try:
-        # Upload profile picture to S3
-        s3_key = upload_file_to_s3(file, current_user.id)
+        # Upload profile picture to S3 - await the async function
+        s3_key = await upload_file_to_s3(file, current_user.id)
 
-        # Update the user's profile picture URL
+        # Store the S3 key in the profile_picture field
+        # The frontend will construct the full URL using this key
         user.profile_picture = s3_key
 
         # Save changes
@@ -248,12 +249,22 @@ async def update_user_profile_patch(
     This endpoint allows updating profile information by sending form data,
     supporting partial updates of profile details and file uploads.
     """
+    # Set up logging
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Get user from database
     user = db.query(User).filter(User.id == current_user.id).first()
+    
+    # Log the current state
+    logger.info(f"Updating user profile for user_id={current_user.id}")
+    logger.info(f"Current profile: full_name='{user.full_name}', profile_picture='{user.profile_picture}'")
+    logger.info(f"Update request: full_name='{full_name}', profile_picture={profile_picture is not None}")
 
     # Update full name if provided
     if full_name:
         user.full_name = full_name
+        logger.info(f"Updated full_name to: {full_name}")
 
     # Update profile picture if provided
     if profile_picture:
@@ -261,6 +272,7 @@ async def update_user_profile_patch(
             # Read a small portion of the file to determine its MIME type
             file_header = await profile_picture.read(2048)
             mime_type = magic.from_buffer(file_header, mime=True)
+            logger.info(f"Detected MIME type: {mime_type}")
 
             # Reset file position after reading the header
             await profile_picture.seek(0)
@@ -280,13 +292,16 @@ async def update_user_profile_patch(
             s3_key = f"profile_pictures/{current_user.id}/{unique_filename}"
             profile_picture.filename = s3_key
 
-            # Upload profile picture to S3
-            s3_key = upload_file_to_s3(profile_picture, current_user.id)
-
+            # Upload profile picture to S3 - await the async function
+            s3_key = await upload_file_to_s3(profile_picture, current_user.id)
+            logger.info(f"S3 key after upload: {s3_key}")
+            
             # Update the user's profile picture URL
             user.profile_picture = s3_key
+            logger.info(f"Updated user profile_picture to: {user.profile_picture}")
 
         except Exception as e:
+            logger.error(f"Failed to upload profile picture: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to upload profile picture: {str(e)}"
@@ -297,6 +312,38 @@ async def update_user_profile_patch(
     db.refresh(user)
 
     return user
+
+
+@router.get("/profile-picture/{s3_key:path}")
+async def get_profile_picture(s3_key: str):
+    """
+    Serve a profile picture from S3.
+    
+    This endpoint retrieves a profile picture from S3 and serves it directly.
+    The s3_key is the path to the file in S3.
+    """
+    try:
+        from utils.s3 import get_file_from_s3
+        # Get the file content from S3
+        file_content = await get_file_from_s3(s3_key)
+        
+        # Determine content type (default to JPEG if unknown)
+        content_type = "image/jpeg"
+        if s3_key.lower().endswith(".png"):
+            content_type = "image/png"
+        elif s3_key.lower().endswith(".gif"):
+            content_type = "image/gif"
+        
+        # Return the file content with appropriate headers
+        return Response(
+            content=file_content,
+            media_type=content_type
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Profile picture not found: {str(e)}"
+        )
 
 
 @router.delete("/profile", status_code=status.HTTP_204_NO_CONTENT)

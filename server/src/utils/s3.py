@@ -6,6 +6,7 @@ This module provides functions for interacting with AWS S3 storage.
 
 import os
 import boto3
+import aioboto3
 import asyncio
 from botocore.exceptions import ClientError
 from fastapi import UploadFile, HTTPException
@@ -81,63 +82,103 @@ async def upload_file_to_s3(
     Returns:
         String containing the S3 key
     """
+    logger.info(f"Starting S3 upload with file type: {type(file)}")
     try:
-        # Create a unique filename
-        if isinstance(file, UploadFile):
-            original_filename = file.filename
-        else:
-            # Use provided filename or default
-            original_filename = filename or f"file.bin"
-
-        # Get file extension
-        file_extension = original_filename.split(
-            '.')[-1] if '.' in original_filename else 'bin'
-
-        unique_id = str(uuid.uuid4())
-        s3_key = f"{session_id if session_id else 'general'}/{unique_id}_{original_filename}"
-
-        # Use boto3 to upload to AWS S3
-        s3_client = get_s3_client()
+        # Create aioboto3 session for async operations
         bucket_name = settings.AWS_S3_BUCKET_NAME
 
-        logger.info(
-            f"Uploading file to S3 bucket: {bucket_name}, key: {s3_key}")
-
-        # Read the file content based on the input type
-        if isinstance(file, bytes):
-            # Already have bytes
+        # Process the file based on its type
+        if isinstance(file, UploadFile):
+            original_filename = file.filename or "file.bin"
+            logger.info(f"Processing UploadFile: {original_filename}, content_type: {getattr(file, 'content_type', 'unknown')}")
+            
+            # Read the file content directly
+            try:
+                file_content = await file.read()
+                logger.info(f"Successfully read file content, type: {type(file_content)}, size: {len(file_content) if isinstance(file_content, bytes) else 'unknown'}")
+                # Reset the file position for potential future reads
+                await file.seek(0)
+            except Exception as e:
+                logger.error(f"Error reading file content: {str(e)}")
+                raise ValueError(f"Failed to read file content: {str(e)}")
+        elif isinstance(file, bytes):
+            original_filename = filename or "file.bin"
             file_content = file
-        elif isinstance(file, UploadFile):
-            file_content = await file.read()
-            # Reset file position for future reads
-            await file.seek(0)
-        else:
-            # For regular file objects like BytesIO
-            if hasattr(file, 'tell') and hasattr(file, 'seek'):
-                current_pos = file.tell()
-                file_content = file.read()
-                file.seek(current_pos)  # Reset position
+        elif hasattr(file, 'read'):
+            original_filename = filename or "file.bin"
+            read_method = getattr(file, "read", None)
+            if callable(read_method):
+                file_content = read_method()
             else:
-                # Handle raw bytes
-                file_content = file if isinstance(file, bytes) else file.read()
+                logger.error("Provided file-like object does not have a callable read method.")
+                raise ValueError("Invalid file-like object for upload.")
+            if hasattr(file, 'seek') and callable(file.seek):
+                # Check if seek is a coroutine function
+                if asyncio.iscoroutinefunction(file.seek):
+                    await file.seek(0)
+                else:
+                    file.seek(0)
+        else:
+            logger.error(f"Unsupported file type for S3 upload: {type(file)}")
+            raise ValueError("Unsupported file type. Must be UploadFile, bytes, or a file-like object.")
 
-        # Upload to S3 using a thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: s3_client.put_object(
+        if not file_content:
+            logger.warning("Attempted to upload empty file content.")
+            raise ValueError("Empty file content cannot be uploaded.")
+
+        safe_filename = "".join(c if c.isalnum() or c in '._- ' else '_' for c in original_filename)
+        unique_id = str(uuid.uuid4())
+        s3_key_prefix = str(session_id) if session_id else 'general'
+        s3_key = f"{s3_key_prefix}/{unique_id}_{safe_filename}"
+
+        logger.info(f"Uploading file to S3 bucket: {bucket_name}, key: {s3_key}")
+
+        s3_client_args = {
+            'aws_access_key_id': settings.AWS_ACCESS_KEY_ID,
+            'aws_secret_access_key': settings.AWS_SECRET_ACCESS_KEY,
+            'region_name': settings.AWS_REGION
+        }
+        
+        if settings.AWS_ENDPOINT_URL:
+            s3_client_args['endpoint_url'] = settings.AWS_ENDPOINT_URL
+            
+        # Create aioboto3 session
+        session = aioboto3.Session()
+        
+        # Ensure file_content is bytes before uploading
+        if not isinstance(file_content, bytes):
+            logger.warning(f"file_content is not bytes, it's {type(file_content)}. Converting if possible.")
+            if asyncio.iscoroutine(file_content):
+                logger.info("Awaiting coroutine to get bytes content")
+                file_content = await file_content
+            elif hasattr(file_content, 'read') and callable(file_content.read):
+                logger.info("Reading from file-like object")
+                file_content = file_content.read()
+            elif isinstance(file_content, str):
+                logger.info("Converting string to bytes")
+                file_content = file_content.encode('utf-8')
+                
+        # Final check to ensure we have bytes
+        if not isinstance(file_content, bytes):
+            logger.error(f"Failed to convert file_content to bytes, type is {type(file_content)}")
+            raise ValueError(f"Cannot upload content of type {type(file_content)} to S3")
+        
+        async with session.client("s3", **s3_client_args) as s3_client:
+            logger.info(f"Uploading to S3 with content type: {getattr(file, 'content_type', 'application/octet-stream') if isinstance(file, UploadFile) else 'application/octet-stream'}")
+            await s3_client.put_object(
                 Bucket=bucket_name,
                 Key=s3_key,
-                Body=file_content
+                Body=file_content,
+                ContentType=getattr(file, 'content_type', 'application/octet-stream') if isinstance(file, UploadFile) else 'application/octet-stream'
             )
-        )
-
-        logger.info(f"File uploaded to S3: {s3_key}")
+        logger.info(f"File uploaded to S3 successfully: {s3_key}")
         return s3_key
-
+    except ClientError as e:
+        logger.error(f"S3 ClientError during upload: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
+        raise HTTPException(status_code=500, detail=f"S3 upload failed: {e.response['Error']['Message']}")
     except Exception as e:
-        logger.error(f"Error in upload_file_to_s3: {str(e)}")
-        raise
+        logger.error(f"Unexpected error during S3 upload: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during file upload: {str(e)}")
 
 
 async def get_file_from_s3(s3_key: str) -> bytes:
