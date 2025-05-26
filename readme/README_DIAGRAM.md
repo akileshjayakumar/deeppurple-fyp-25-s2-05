@@ -4,6 +4,124 @@
 
 This document provides a comprehensive architecture diagram for the DeepPurple text analysis platform, showing the complete tech stack from frontend to database with cloud services integration. The diagrams are designed to be easy to understand for beginners while providing valuable technical insights.
 
+## Database Entity Relationship Diagram (ERD)
+
+```mermaid
+erDiagram
+    USERS {
+        int id PK
+        string email
+        string hashed_password
+        string full_name
+        string profile_picture
+        boolean is_active
+        boolean is_admin
+        string user_tier
+        datetime created_at
+        datetime updated_at
+        string google_id
+    }
+
+    SESSIONS {
+        int id PK
+        string name
+        int user_id FK
+        boolean is_archived
+        datetime created_at
+        datetime updated_at
+    }
+
+    FILES {
+        int id PK
+        string filename
+        string file_type
+        string s3_key
+        int session_id FK
+        string original_filename
+        int file_size
+        datetime uploaded_at
+        datetime processed_at
+    }
+
+    FILE_CONTENTS {
+        int id PK
+        int file_id FK
+        text content
+        datetime processed_at
+    }
+
+    INSIGHTS {
+        int id PK
+        int session_id FK
+        string insight_type
+        json value
+        datetime created_at
+    }
+
+    QUESTIONS {
+        int id PK
+        int session_id FK
+        text question_text
+        text answer_text
+        datetime created_at
+        datetime answered_at
+    }
+
+    USERS ||--o{ SESSIONS : "creates"
+    SESSIONS ||--o{ FILES : "contains"
+    FILES ||--|| FILE_CONTENTS : "has"
+    SESSIONS ||--o{ INSIGHTS : "generates"
+    SESSIONS ||--o{ QUESTIONS : "asks"
+
+    %% Apply black borders to all
+    classDef allBlack stroke:#000000,stroke-width:2px
+
+    class USERS,SESSIONS,FILES,FILE_CONTENTS,INSIGHTS,QUESTIONS allBlack
+```
+
+## Database Schema Explanation
+
+The DeepPurple application uses a PostgreSQL database with the following tables:
+
+1. **USERS**: Stores user account information
+
+   - Primary authentication data (email, hashed_password)
+   - Profile information (full_name, profile_picture)
+   - Account status (is_active, is_admin)
+   - User tier for subscription levels
+   - OAuth integration (google_id)
+
+2. **SESSIONS**: Represents analysis sessions created by users
+
+   - Each session belongs to a user (user_id foreign key)
+   - Sessions can be archived to hide from default views
+   - Timestamps track creation and updates
+
+3. **FILES**: Contains metadata about uploaded files
+
+   - Links to a session (session_id foreign key)
+   - Stores file information (filename, file_type, file_size)
+   - Contains S3 storage location (s3_key)
+   - Tracks upload and processing timestamps
+
+4. **FILE_CONTENTS**: Stores the extracted text content from files
+
+   - One-to-one relationship with FILES (file_id foreign key)
+   - Contains the actual text content extracted from the file
+   - Records when the content was processed
+
+5. **INSIGHTS**: Stores analysis results from processed content
+
+   - Links to a session (session_id foreign key)
+   - Different types of insights (sentiment, emotion, topic, summary)
+   - Stores structured data in JSON format (value)
+   - Records when the insight was created
+
+6. **QUESTIONS**: Tracks user questions about analyzed content
+   - Links to a session (session_id foreign key)
+   - Stores both the question text and generated answer
+   - Tracks when questions were asked and answered
+
 ## System Architecture
 
 ### high-level-system-architecture-diagram.png
