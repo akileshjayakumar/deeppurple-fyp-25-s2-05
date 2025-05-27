@@ -155,6 +155,28 @@ export const sessionApi = {
     const response = await api.get(`/sessions/${sessionId}/messages`);
     return response.data;
   },
+
+  // Export session data to different formats
+  exportToCSV: async (sessionId: string) => {
+    const response = await api.get(`/sessions/${sessionId}/export/csv`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  exportToMarkdown: async (sessionId: string) => {
+    const response = await api.get(`/sessions/${sessionId}/export/md`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  exportToPDF: async (sessionId: string) => {
+    const response = await api.get(`/sessions/${sessionId}/export/pdf`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
 };
 
 // Analysis APIs

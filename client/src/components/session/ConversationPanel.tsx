@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ExportOptions } from "./ExportOptions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ConversationMessage } from "@/types";
 import { toast } from "sonner";
@@ -171,7 +172,10 @@ export function ConversationPanel({ sessionId }: ConversationPanelProps) {
 
   return (
     <Card className="flex flex-col h-[500px] border shadow-sm">
-      <CardHeader className="bg-white border-b">
+      <CardHeader className="bg-white border-b relative">
+        <div className="absolute top-4 right-4">
+          <ExportOptions sessionId={sessionId} />
+        </div>
         <CardTitle>Conversation</CardTitle>
         <CardDescription>
           Ask questions about the content in this session

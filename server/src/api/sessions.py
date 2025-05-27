@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from fastapi.responses import StreamingResponse
@@ -7,6 +7,8 @@ import io
 import csv
 import json
 import markdown2
+import pandas as pd
+from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
@@ -472,3 +474,203 @@ async def list_session_messages(
 
     # Format the messages as question-answer pairs
     return messages
+
+
+@router.get("/{session_id}/export/csv")
+async def export_session_to_csv(
+    session_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export session messages to CSV format.
+
+    This endpoint allows the authenticated user to export all messages from a session
+    in CSV format for download.
+    """
+    # Verify session belongs to user
+    session = db.query(SessionModel).filter(
+        SessionModel.id == session_id,
+        SessionModel.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+
+    # Get messages for session
+    messages = db.query(Question).filter(
+        Question.session_id == session_id
+    ).order_by(Question.created_at.asc()).all()
+
+    # Convert to pandas DataFrame
+    data = []
+    for msg in messages:
+        data.append({
+            "timestamp": msg.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "role": "user",
+            "content": msg.question_text
+        })
+        if msg.answer_text:
+            data.append({
+                "timestamp": msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "role": "assistant",
+                "content": msg.answer_text
+            })
+
+    df = pd.DataFrame(data)
+    
+    # Create a string buffer to store the CSV
+    buffer = io.StringIO()
+    df.to_csv(buffer, index=False)
+    buffer.seek(0)
+    
+    # Generate a filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"session_{session_id}_{timestamp}.csv"
+    
+    # Return the CSV as a streaming response
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/{session_id}/export/md")
+async def export_session_to_markdown(
+    session_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export session messages to Markdown format.
+
+    This endpoint allows the authenticated user to export all messages from a session
+    in Markdown format for download.
+    """
+    # Verify session belongs to user
+    session = db.query(SessionModel).filter(
+        SessionModel.id == session_id,
+        SessionModel.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+
+    # Get messages for session
+    messages = db.query(Question).filter(
+        Question.session_id == session_id
+    ).order_by(Question.created_at.asc()).all()
+    
+    # Create markdown content
+    md_content = f"# Session: {session.name}\n\n"
+    md_content += f"*Exported on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
+    
+    for msg in messages:
+        # Add user question
+        md_content += f"## User ({msg.created_at.strftime('%Y-%m-%d %H:%M:%S')})\n\n"
+        md_content += f"{msg.question_text}\n\n"
+        
+        # Add assistant response if available
+        if msg.answer_text:
+            timestamp = msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            md_content += f"## Assistant ({timestamp})\n\n"
+            md_content += f"{msg.answer_text}\n\n"
+            md_content += "---\n\n"
+    
+    # Generate a filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"session_{session_id}_{timestamp}.md"
+    
+    # Return the markdown content as a downloadable file
+    return Response(
+        content=md_content,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@router.get("/{session_id}/export/pdf")
+async def export_session_to_pdf(
+    session_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export session messages to PDF format.
+
+    This endpoint allows the authenticated user to export all messages from a session
+    in PDF format for download.
+    """
+    # Verify session belongs to user
+    session = db.query(SessionModel).filter(
+        SessionModel.id == session_id,
+        SessionModel.user_id == current_user.id
+    ).first()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+
+    # Get messages for session
+    messages = db.query(Question).filter(
+        Question.session_id == session_id
+    ).order_by(Question.created_at.asc()).all()
+    
+    # Create a buffer for the PDF
+    buffer = io.BytesIO()
+    
+    # Create the PDF document
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    # Add title and timestamp
+    title_style = styles["Title"]
+    elements.append(Paragraph(f"Session: {session.name}", title_style))
+    elements.append(Paragraph(f"Exported on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]))
+    elements.append(Spacer(1, 12))
+    
+    # Add conversation content
+    for msg in messages:
+        # Add user question
+        elements.append(Paragraph(f"<b>User</b> ({msg.created_at.strftime('%Y-%m-%d %H:%M:%S')})", styles["Heading2"]))
+        elements.append(Paragraph(msg.question_text, styles["Normal"]))
+        elements.append(Spacer(1, 12))
+        
+        # Add assistant response if available
+        if msg.answer_text:
+            timestamp = msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            elements.append(Paragraph(f"<b>Assistant</b> ({timestamp})", styles["Heading2"]))
+            elements.append(Paragraph(msg.answer_text, styles["Normal"]))
+            elements.append(Spacer(1, 12))
+            
+            # Add a divider
+            elements.append(Paragraph("<hr/>", styles["Normal"]))
+            elements.append(Spacer(1, 12))
+    
+    # Build the PDF
+    doc.build(elements)
+    
+    # Get the PDF content from the buffer
+    buffer.seek(0)
+    pdf_content = buffer.getvalue()
+    
+    # Generate a filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"session_{session_id}_{timestamp}.pdf"
+    
+    # Return the PDF as a streaming response
+    return Response(
+        content=pdf_content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

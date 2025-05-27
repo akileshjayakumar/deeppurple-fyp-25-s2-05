@@ -15,6 +15,7 @@ import {
   FileText,
   FileDown,
   ChevronDown,
+  Download,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { sessionApi, analysisApi, fileApi } from "@/lib/api";
+import { ExportOptions } from "@/components/session/ExportOptions";
 
 interface Message {
   id: string;
@@ -431,12 +433,14 @@ function DashboardContent() {
     <div className="h-[calc(100vh-8rem)] flex flex-col">
       {/* Chat Header */}
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold">
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-bold">
             {currentSessionId ? "Current Conversation" : "New Conversation"}
-          </h1>
+          </h2>
+          {currentSessionId && messages.some(msg => msg.role === "assistant" && msg.id !== "welcome-message") && (
+            <ExportOptions sessionId={currentSessionId} />
+          )}
         </div>
-        
         {/* Save Session button removed to enable auto-save */}
       </div>
 
