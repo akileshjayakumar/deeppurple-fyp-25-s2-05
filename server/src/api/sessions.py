@@ -157,25 +157,35 @@ async def delete_session(
     Delete a session.
 
     This endpoint allows the authenticated user to delete a session and all associated data.
+    Deletion is idempotent - requesting deletion of an already deleted session will return success.
     """
-    # Get session from database
-    session = db.query(SessionModel).filter(
-        SessionModel.id == session_id,
-        SessionModel.user_id == current_user.id
-    ).first()
+    try:
+        # Get session from database
+        session = db.query(SessionModel).filter(
+            SessionModel.id == session_id,
+            SessionModel.user_id == current_user.id
+        ).first()
 
-    # Check if session exists
-    if not session:
+        # Check if session exists
+        if not session:
+            # Return success even if session doesn't exist (idempotent delete)
+            return None
+
+        # Delete session (cascade will delete associated files, insights, and questions)
+        db.delete(session)
+        db.commit()
+
+        return None
+    except Exception as e:
+        # Roll back transaction in case of error
+        db.rollback()
+        # Log the error for debugging
+        print(f"Error deleting session {session_id}: {str(e)}")
+        # Return a 500 error with details
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete session: {str(e)}"
         )
-
-    # Delete session (cascade will delete associated files, insights, and questions)
-    db.delete(session)
-    db.commit()
-
-    return None
 
 
 @router.get("/{session_id}/files", response_model=List[schemas.FileResponse])
@@ -427,354 +437,6 @@ async def filter_sessions_by_emotion(
 
     return {"sessions": sessions, "total_count": total_count}
 
-
-@router.get("/{session_id}/export")
-async def export_session_report(
-    session_id: int,
-    format: str = "markdown",  # Options: markdown, pdf, csv
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Export session report.
-
-    This endpoint generates a report of session insights in the specified format.
-    Supported formats: markdown, pdf, csv.
-    """
-    # Verify session belongs to user
-    session = db.query(SessionModel).filter(
-        SessionModel.id == session_id,
-        SessionModel.user_id == current_user.id
-    ).first()
-
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found"
-        )
-
-    # Get all insights for the session
-    insights = db.query(Insight).filter(
-        Insight.session_id == session_id
-    ).order_by(Insight.created_at).all()
-
-    # Get all questions for the session
-    questions = db.query(Question).filter(
-        Question.session_id == session_id
-    ).order_by(Question.created_at).all()
-
-    # Get all files for the session
-    files = db.query(File).filter(
-        File.session_id == session_id
-    ).all()
-
-    # Generate report based on format
-    if format.lower() == "markdown":
-        return export_markdown(session, insights, questions, files)
-    elif format.lower() == "pdf":
-        return export_pdf(session, insights, questions, files)
-    elif format.lower() == "csv":
-        return export_csv(session, insights, questions, files)
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid format. Supported formats: markdown, pdf, csv"
-        )
-
-
-def export_markdown(session, insights, questions, files):
-    """Generate a Markdown report"""
-    report = f"# Session Report: {session.name}\n\n"
-    report += f"**Created on:** {session.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-
-    # Files section
-    report += "## Files\n\n"
-    if files:
-        for file in files:
-            report += f"- {file.filename} ({file.file_type}, {file.file_size} bytes)\n"
-    else:
-        report += "No files uploaded.\n"
-
-    report += "\n"
-
-    # Insights section
-    report += "## Insights\n\n"
-
-    # Sentiment
-    sentiment_insights = [i for i in insights if i.insight_type == "sentiment"]
-    if sentiment_insights:
-        report += "### Sentiment Analysis\n\n"
-        for insight in sentiment_insights:
-            sentiment = insight.value
-            report += f"- **Score:** {sentiment.get('score', 'N/A')}\n"
-            report += f"- **Label:** {sentiment.get('label', 'N/A')}\n"
-            report += f"- **Created on:** {insight.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-
-    # Emotions
-    emotion_insights = [i for i in insights if i.insight_type == "emotion"]
-    if emotion_insights:
-        report += "### Emotion Analysis\n\n"
-        for insight in emotion_insights:
-            emotions = insight.value
-            report += "| Emotion | Score |\n|---------|-------|\n"
-            for emotion, score in emotions.items():
-                report += f"| {emotion} | {score:.2f} |\n"
-            report += f"\n**Created on:** {insight.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-
-    # Topics
-    topic_insights = [i for i in insights if i.insight_type == "topic"]
-    if topic_insights:
-        report += "### Topics\n\n"
-        for insight in topic_insights:
-            if "topics" in insight.value:
-                topics = insight.value["topics"]
-                for topic in topics:
-                    report += f"- {topic}\n"
-                report += f"\n**Created on:** {insight.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-
-    # Summaries
-    summary_insights = [i for i in insights if i.insight_type == "summary"]
-    if summary_insights:
-        report += "### Summaries\n\n"
-        for insight in summary_insights:
-            if "summary" in insight.value:
-                summary = insight.value["summary"]
-                report += f"{summary}\n\n"
-                report += f"**Created on:** {insight.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-
-    # Q&A section
-    if questions:
-        report += "## Questions & Answers\n\n"
-        for question in questions:
-            report += f"### Q: {question.question_text}\n\n"
-            report += f"A: {question.answer_text}\n\n"
-            report += f"**Asked on:** {question.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-
-    # Create a streaming response
-    stream = io.StringIO()
-    stream.write(report)
-    stream.seek(0)
-
-    return StreamingResponse(
-        iter([stream.getvalue()]),
-        media_type="text/markdown",
-        headers={
-            "Content-Disposition": f"attachment; filename=session_report_{session.id}.md"}
-    )
-
-
-def export_pdf(session, insights, questions, files):
-    """Generate a PDF report"""
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-    styles = getSampleStyleSheet()
-    elements = []
-
-    # Title
-    elements.append(
-        Paragraph(f"Session Report: {session.name}", styles["Title"]))
-    elements.append(Paragraph(
-        f"Created on: {session.created_at.strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]))
-    elements.append(Spacer(1, 12))
-
-    # Files section
-    elements.append(Paragraph("Files", styles["Heading2"]))
-    if files:
-        file_data = []
-        file_data.append(["Filename", "Type", "Size (bytes)"])
-        for file in files:
-            file_data.append(
-                [file.filename, file.file_type, str(file.file_size)])
-
-        table = Table(file_data)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), '#CCCCCC'),
-            ('TEXTCOLOR', (0, 0), (-1, 0), '#000000'),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), '#FFFFFF'),
-            ('GRID', (0, 0), (-1, -1), 1, '#000000')
-        ]))
-        elements.append(table)
-    else:
-        elements.append(Paragraph("No files uploaded.", styles["Normal"]))
-
-    elements.append(Spacer(1, 12))
-
-    # Insights section
-    elements.append(Paragraph("Insights", styles["Heading2"]))
-
-    # Sentiment
-    sentiment_insights = [i for i in insights if i.insight_type == "sentiment"]
-    if sentiment_insights:
-        elements.append(Paragraph("Sentiment Analysis", styles["Heading3"]))
-        for insight in sentiment_insights:
-            sentiment = insight.value
-            elements.append(
-                Paragraph(f"Score: {sentiment.get('score', 'N/A')}", styles["Normal"]))
-            elements.append(
-                Paragraph(f"Label: {sentiment.get('label', 'N/A')}", styles["Normal"]))
-            elements.append(Paragraph(
-                f"Created on: {insight.created_at.strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]))
-            elements.append(Spacer(1, 12))
-
-    # Emotions
-    emotion_insights = [i for i in insights if i.insight_type == "emotion"]
-    if emotion_insights:
-        elements.append(Paragraph("Emotion Analysis", styles["Heading3"]))
-        for insight in emotion_insights:
-            emotions = insight.value
-            emotion_data = [["Emotion", "Score"]]
-            for emotion, score in emotions.items():
-                emotion_data.append([emotion, f"{score:.2f}"])
-
-            table = Table(emotion_data)
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), '#CCCCCC'),
-                ('TEXTCOLOR', (0, 0), (-1, 0), '#000000'),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), '#FFFFFF'),
-                ('GRID', (0, 0), (-1, -1), 1, '#000000')
-            ]))
-            elements.append(table)
-            elements.append(Paragraph(
-                f"Created on: {insight.created_at.strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]))
-            elements.append(Spacer(1, 12))
-
-    # Topics
-    topic_insights = [i for i in insights if i.insight_type == "topic"]
-    if topic_insights:
-        elements.append(Paragraph("Topics", styles["Heading3"]))
-        for insight in topic_insights:
-            if "topics" in insight.value:
-                topics = insight.value["topics"]
-                for topic in topics:
-                    elements.append(Paragraph(f"• {topic}", styles["Normal"]))
-                elements.append(Paragraph(
-                    f"Created on: {insight.created_at.strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]))
-                elements.append(Spacer(1, 12))
-
-    # Summaries
-    summary_insights = [i for i in insights if i.insight_type == "summary"]
-    if summary_insights:
-        elements.append(Paragraph("Summaries", styles["Heading3"]))
-        for insight in summary_insights:
-            if "summary" in insight.value:
-                summary = insight.value["summary"]
-                elements.append(Paragraph(summary, styles["Normal"]))
-                elements.append(Paragraph(
-                    f"Created on: {insight.created_at.strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]))
-                elements.append(Spacer(1, 12))
-
-    # Q&A section
-    if questions:
-        elements.append(Paragraph("Questions & Answers", styles["Heading2"]))
-        for question in questions:
-            elements.append(
-                Paragraph(f"Q: {question.question_text}", styles["Heading4"]))
-            elements.append(
-                Paragraph(f"A: {question.answer_text}", styles["Normal"]))
-            elements.append(Paragraph(
-                f"Asked on: {question.created_at.strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]))
-            elements.append(Spacer(1, 12))
-
-    # Build PDF
-    doc.build(elements)
-    buffer.seek(0)
-
-    return StreamingResponse(
-        buffer,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"attachment; filename=session_report_{session.id}.pdf"}
-    )
-
-
-def export_csv(session, insights, questions, files):
-    """Generate a CSV report"""
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-
-    # Write session info
-    writer.writerow(["Session Report"])
-    writer.writerow(["Name", session.name])
-    writer.writerow(
-        ["Created on", session.created_at.strftime('%Y-%m-%d %H:%M:%S')])
-    writer.writerow([])
-
-    # Write files
-    writer.writerow(["Files"])
-    writer.writerow(["Filename", "Type", "Size (bytes)"])
-    for file in files:
-        writer.writerow([file.filename, file.file_type, file.file_size])
-    writer.writerow([])
-
-    # Write sentiment insights
-    writer.writerow(["Sentiment Analysis"])
-    sentiment_insights = [i for i in insights if i.insight_type == "sentiment"]
-    for insight in sentiment_insights:
-        sentiment = insight.value
-        writer.writerow(["Score", sentiment.get('score', 'N/A')])
-        writer.writerow(["Label", sentiment.get('label', 'N/A')])
-        writer.writerow(
-            ["Created on", insight.created_at.strftime('%Y-%m-%d %H:%M:%S')])
-        writer.writerow([])
-
-    # Write emotion insights
-    writer.writerow(["Emotion Analysis"])
-    emotion_insights = [i for i in insights if i.insight_type == "emotion"]
-    for insight in emotion_insights:
-        emotions = insight.value
-        writer.writerow(["Emotion", "Score"])
-        for emotion, score in emotions.items():
-            writer.writerow([emotion, f"{score:.2f}"])
-        writer.writerow(
-            ["Created on", insight.created_at.strftime('%Y-%m-%d %H:%M:%S')])
-        writer.writerow([])
-
-    # Write topic insights
-    writer.writerow(["Topics"])
-    topic_insights = [i for i in insights if i.insight_type == "topic"]
-    for insight in topic_insights:
-        if "topics" in insight.value:
-            topics = insight.value["topics"]
-            for topic in topics:
-                writer.writerow(["Topic", topic])
-            writer.writerow(
-                ["Created on", insight.created_at.strftime('%Y-%m-%d %H:%M:%S')])
-            writer.writerow([])
-
-    # Write summary insights
-    writer.writerow(["Summaries"])
-    summary_insights = [i for i in insights if i.insight_type == "summary"]
-    for insight in summary_insights:
-        if "summary" in insight.value:
-            summary = insight.value["summary"]
-            writer.writerow(["Summary", summary])
-            writer.writerow(
-                ["Created on", insight.created_at.strftime('%Y-%m-%d %H:%M:%S')])
-            writer.writerow([])
-
-    # Write Q&A
-    writer.writerow(["Questions & Answers"])
-    for question in questions:
-        writer.writerow(["Question", question.question_text])
-        writer.writerow(["Answer", question.answer_text])
-        writer.writerow(
-            ["Asked on", question.created_at.strftime('%Y-%m-%d %H:%M:%S')])
-        writer.writerow([])
-
-    buffer.seek(0)
-
-    return StreamingResponse(
-        iter([buffer.getvalue()]),
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=session_report_{session.id}.csv"}
-    )
 
 
 @router.get("/{session_id}/messages", response_model=List[schemas.SessionMessage])
