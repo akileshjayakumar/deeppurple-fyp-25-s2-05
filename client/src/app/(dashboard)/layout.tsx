@@ -12,6 +12,7 @@ import {
   X,
   ShieldAlert,
   Plus,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,8 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { sessionApi } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 interface NavItemProps {
   icon: React.ReactNode;
@@ -53,8 +56,10 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
   const { user, logout } = useAuth();
+  const [isCreatingSession, setIsCreatingSession] = React.useState(false);
   
   // Add a state to force re-render when user data changes
   const [forceUpdate, setForceUpdate] = React.useState(0);
@@ -74,6 +79,27 @@ export default function DashboardLayout({
       window.removeEventListener('user-updated', handleUserUpdated);
     };
   }, []);
+
+  const handleCreateSession = async () => {
+    setIsCreatingSession(true);
+    try {
+      // Create a fresh session with a default name
+      // The name will be updated based on the first message when sent
+      const session = await sessionApi.createSession("New Conversation");
+      
+      toast.success("New session created");
+      
+      // Navigate to the dashboard with the new session ID
+      // This preserves the previous session in the database
+      router.push(`/dashboard?session=${session.id}`);
+    } catch (error) {
+      console.error("Error creating new session:", error);
+      toast.error("Failed to create new session");
+    } finally {
+      setIsCreatingSession(false);
+      setIsMobileNavOpen(false); // Close mobile nav if open
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -156,9 +182,23 @@ export default function DashboardLayout({
               </div>
 
               <div className="p-4">
-                <Button variant="outline" className="w-full justify-start mb-4">
-                  <Plus size={18} className="mr-2" />
-                  New Session
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start mb-4" 
+                  onClick={handleCreateSession}
+                  disabled={isCreatingSession}
+                >
+                  {isCreatingSession ? (
+                    <>
+                      <Loader2 size={18} className="mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={18} className="mr-2" />
+                      New Session
+                    </>
+                  )}
                 </Button>
               </div>
 
@@ -194,12 +234,24 @@ export default function DashboardLayout({
           </div>
 
           <div className="p-4">
-            <Link href="/sessions">
-              <Button variant="outline" className="w-full justify-start">
-                <Plus size={18} className="mr-2" />
-                New Session
-              </Button>
-            </Link>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start" 
+              onClick={handleCreateSession}
+              disabled={isCreatingSession}
+            >
+              {isCreatingSession ? (
+                <>
+                  <Loader2 size={18} className="mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus size={18} className="mr-2" />
+                  New Session
+                </>
+              )}
+            </Button>
           </div>
 
           <nav className="flex-1 p-4 flex flex-col gap-1">

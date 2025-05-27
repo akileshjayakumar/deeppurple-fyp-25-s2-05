@@ -149,18 +149,7 @@ export const sessionApi = {
     return response.data;
   },
 
-  exportSessionReport: async (
-    sessionId: string,
-    format: "markdown" | "pdf" | "csv"
-  ) => {
-    const response = await api.get(`/sessions/${sessionId}/export`, {
-      params: { format },
-      responseType: "blob",
-    });
 
-    // Return the blob directly
-    return response.data;
-  },
 
   getSessionMessages: async (sessionId: string) => {
     const response = await api.get(`/sessions/${sessionId}/messages`);

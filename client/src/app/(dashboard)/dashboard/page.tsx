@@ -53,9 +53,7 @@ interface Message {
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [newSessionName, setNewSessionName] = useState("");
   const [isCreatingSession, setIsCreatingSession] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   // Chat functionality
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -73,48 +71,74 @@ function DashboardContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
-  const exportDropdownRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
-  
-  // Close export dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        exportDropdownRef.current &&
-        !exportDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsExportDropdownOpen(false);
-      }
-    };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
-  // Load session from URL query parameter
+  // Load session from URL parameter or find the most recent session
   useEffect(() => {
     const sessionId = searchParams.get('session');
     console.log('Session ID from URL:', sessionId);
+    
     if (sessionId) {
+      // If a specific session ID is provided in the URL, load that session
       loadExistingSession(sessionId);
     } else {
-      // Reset to default state when no session is selected
-      setCurrentSessionId(null);
-      setMessages([
-        {
-          id: "welcome-message",
-          content: "Welcome to DeepPurple! How can I help you with sentiment analysis today?",
-          role: "system",
-          timestamp: new Date(),
-        },
-      ]);
+      // When no session ID is provided, try to find the most recent session
+      const findMostRecentSession = async () => {
+        try {
+          setIsLoading(true);
+          // Get all sessions
+          const response = await sessionApi.getSessions();
+          const sessions = response.sessions || [];
+          
+          if (sessions.length > 0) {
+            // Sort sessions by created_at date in descending order
+            const sortedSessions = [...sessions].sort((a, b) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+            
+            // Load the most recent session
+            const mostRecentSession = sortedSessions[0];
+            console.log('Loading most recent session:', mostRecentSession.id);
+            loadExistingSession(mostRecentSession.id);
+            
+            // Update URL to include session ID without full page refresh
+            window.history.pushState({}, '', `/dashboard?session=${mostRecentSession.id}`);
+          } else {
+            // Only create a new session if no sessions exist at all
+            console.log('No existing sessions found, creating new one');
+            setIsCreatingSession(true);
+            const session = await sessionApi.createSession("New Conversation");
+            setCurrentSessionId(session.id);
+            
+            // Update URL to include session ID without full page refresh
+            window.history.pushState({}, '', `/dashboard?session=${session.id}`);
+            
+            setMessages([
+              {
+                id: "welcome-message",
+                content:
+                  "Welcome to DeepPurple! How can I help you with sentiment analysis today?",
+                role: "system",
+                timestamp: new Date(),
+              },
+            ]);
+          }
+        } catch (error) {
+          console.error("Error finding or creating session:", error);
+          toast.error("Failed to load session");
+        } finally {
+          setIsCreatingSession(false);
+          setIsLoading(false);
+        }
+      };
+      
+      findMostRecentSession();
     }
   }, [searchParams]);
   
@@ -187,33 +211,6 @@ function DashboardContent() {
     }
   }, []);
 
-  const handleCreateSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!newSessionName.trim()) {
-      toast.error("Session name cannot be empty");
-      return;
-    }
-
-    setIsCreatingSession(true);
-
-    try {
-      const session = await sessionApi.createSession(newSessionName);
-      toast.success("Session created successfully");
-      setNewSessionName("");
-      setIsDialogOpen(false);
-      setCurrentSessionId(session.id);
-
-      // Navigate to the dashboard with the new session ID
-      router.push(`/dashboard?session=${session.id}`);
-    } catch (error) {
-      console.error("Error creating session:", error);
-      toast.error("Failed to create session");
-    } finally {
-      setIsCreatingSession(false);
-    }
-  };
-
   const handleSendMessage = async () => {
     if (!inputValue.trim() && !selectedFile) {
       toast.error("Please enter a question or upload a file");
@@ -226,17 +223,58 @@ function DashboardContent() {
       return;
     }
 
-    // Create a session if one doesn't exist
+    // Get the current session or create one if needed
     let sessionId = currentSessionId;
+    let isFirstMessageInSession = false;
+    let currentSessionData = null;
+    
     if (!sessionId) {
       try {
+        setIsCreatingSession(true);
+        // Create a session with default name initially
         const session = await sessionApi.createSession("New Conversation");
         sessionId = session.id;
         setCurrentSessionId(sessionId);
+        isFirstMessageInSession = true;
+        
+        // Update URL to include session ID without full page refresh
+        window.history.pushState({}, '', `/dashboard?session=${sessionId}`);
+        
+        toast.success("Session created automatically");
       } catch (error) {
         console.error("Error creating session:", error);
         toast.error("Failed to create a new session");
         return;
+      } finally {
+        setIsCreatingSession(false);
+      }
+    } else {
+      try {
+        // Check if this is the first message in an existing session
+        // by fetching the current session data
+        currentSessionData = await sessionApi.getSessionById(sessionId);
+        // If the session still has the default name, we'll update it with the first message
+        isFirstMessageInSession = currentSessionData?.name === "New Conversation";
+      } catch (error) {
+        console.error("Error checking session:", error);
+      }
+    }
+    
+    // If this is the first message, update the session name
+    if (isFirstMessageInSession) {
+      try {
+        // Create a descriptive session name based on the user's first message
+        const sessionName = inputValue.length > 30 
+          ? `${inputValue.substring(0, 30)}...` 
+          : inputValue;
+        
+        // Update the session name
+        // Add type assertion as sessionId is guaranteed to be a string at this point
+        await sessionApi.updateSession(sessionId as string, { name: sessionName });
+        console.log(`Updated session name to: ${sessionName}`);
+      } catch (error) {
+        console.error("Error updating session name:", error);
+        // Non-critical error, so we continue processing the message
       }
     }
 
@@ -382,72 +420,9 @@ function DashboardContent() {
     }
   };
 
-  const handleNewChat = () => {
-    // Reset the chat state
-    setMessages([
-      {
-        id: "welcome-message",
-        content:
-          "Welcome to DeepPurple! How can I help you with sentiment analysis today?",
-        role: "system",
-        timestamp: new Date(),
-      },
-    ]);
-    setInputValue("");
-    setSelectedFile(null);
-    setCurrentSessionId(null);
-  };
+  // Removed handleNewChat function as users should now use the New Session button in the sidebar
   
-  // Handle export functionality
-  const handleExportReport = async (format: "markdown" | "pdf" | "csv") => {
-    if (!currentSessionId) {
-      toast.error("No active session to export");
-      return;
-    }
 
-    try {
-      // Set loading state if needed
-      const response = await fetch(
-        `/api/sessions/${currentSessionId}/export?format=${format}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Export failed with status: ${response.status}`);
-      }
-
-      // Handle different formats
-      if (format === "markdown" || format === "csv") {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `session-export-${format === "markdown" ? "md" : "csv"}`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else if (format === "pdf") {
-        // For PDF, we might need to handle differently
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        window.open(url, "_blank");
-      }
-
-      toast.success(`Exported session as ${format.toUpperCase()}`);
-    } catch (error) {
-      console.error("Export error:", error);
-      toast.error("Failed to export session");
-    } finally {
-      // Reset loading state if needed
-      setIsExportDropdownOpen(false);
-    }
-  };
 
   // Console log for debugging during build
   console.log('Rendering dashboard content, sessionId:', currentSessionId);
@@ -457,102 +432,12 @@ function DashboardContent() {
       {/* Chat Header */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleNewChat}
-            title="New Chat"
-          >
-            <PlusCircle className="h-5 w-5" />
-          </Button>
           <h1 className="text-xl font-bold">
             {currentSessionId ? "Current Conversation" : "New Conversation"}
           </h1>
         </div>
         
-        <div className="flex gap-2">
-          {/* Export Button */}
-          {currentSessionId && (
-            <div className="relative" ref={exportDropdownRef}>
-              <Button
-                variant="outline"
-                className="flex items-center gap-2"
-                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-              >
-                <FileDown className="h-4 w-4" />
-                Export
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-              {isExportDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border rounded-md shadow-lg z-10">
-                  <div className="py-1">
-                    <button
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                      onClick={() => handleExportReport("markdown")}
-                    >
-                      Export as Markdown
-                    </button>
-                    <button
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                      onClick={() => handleExportReport("pdf")}
-                    >
-                      Export as PDF
-                    </button>
-                    <button
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                      onClick={() => handleExportReport("csv")}
-                    >
-                      Export as CSV
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Save Session
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Save Conversation</DialogTitle>
-                <DialogDescription>
-                  Give your conversation a name to save it as a session.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreateSession}>
-                <div className="py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Session Name</Label>
-                    <Input
-                      id="name"
-                      placeholder="E.g., Customer Feedback Analysis"
-                      value={newSessionName}
-                      onChange={(e) => setNewSessionName(e.target.value)}
-                      autoFocus
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={isCreatingSession}>
-                    {isCreatingSession ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      "Save Session"
-                    )}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+        {/* Save Session button removed to enable auto-save */}
       </div>
 
       {/* Chat Messages */}

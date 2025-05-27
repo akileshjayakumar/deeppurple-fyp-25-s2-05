@@ -47,8 +47,7 @@ export default function SessionDetailPage() {
   const [question, setQuestion] = useState("");
   const [isAskingQuestion, setIsAskingQuestion] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
-  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "system-welcome",
@@ -68,23 +67,6 @@ export default function SessionDetailPage() {
   const hasAIResponses = useCallback(() => {
     return messages.some((message) => message.role === "assistant");
   }, [messages]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        exportDropdownRef.current &&
-        !exportDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsExportDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
 
   // Fetch session details and message history
   const fetchSessionData = useCallback(async () => {
@@ -333,47 +315,7 @@ export default function SessionDetailPage() {
     );
   }
 
-  // Handle export functionality
-  const handleExportReport = async (format: "markdown" | "pdf" | "csv") => {
-    // Close the dropdown
-    setIsExportDropdownOpen(false);
 
-    // Check if there are any AI responses to export (excluding the welcome message)
-    if (!hasAIResponses()) {
-      toast.error("No AI responses to export. Ask a question first.");
-      return;
-    }
-
-    try {
-      toast.loading(`Generating ${format.toUpperCase()} report...`);
-      const blob = await sessionApi.exportSessionReport(sessionId, format);
-
-      // Create a URL for the blob
-      const url = window.URL.createObjectURL(blob);
-
-      // Create a temporary link element
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `session_report_${sessionId}.${
-        format === "markdown" ? "md" : format
-      }`;
-
-      // Append link to body, click it, and remove it
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Revoke the URL to free up memory
-      window.URL.revokeObjectURL(url);
-
-      toast.dismiss();
-      toast.success(`Report exported in ${format.toUpperCase()} format`);
-    } catch (error) {
-      toast.dismiss();
-      console.error("Failed to export report:", error);
-      toast.error("Failed to export report");
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -383,52 +325,6 @@ export default function SessionDetailPage() {
           <p className="text-muted-foreground">
             Created on {new Date(session.created_at).toLocaleDateString()}
           </p>
-        </div>
-        <div className="flex gap-2">
-          <div className="relative" ref={exportDropdownRef}>
-            <Button
-              variant="outline"
-              className="flex items-center gap-2"
-              onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-              disabled={!hasAIResponses()}
-              title={
-                !hasAIResponses()
-                  ? "Ask a question first to enable export"
-                  : "Export this session"
-              }
-            >
-              <FileDown className="h-4 w-4" />
-              Export
-              <ChevronDown className="h-4 w-4 opacity-50" />
-            </Button>
-            {isExportDropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-52 bg-white border rounded-md shadow-lg overflow-hidden z-10">
-                <div className="py-1">
-                  <button
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2"
-                    onClick={() => handleExportReport("markdown")}
-                  >
-                    <span className="w-5 text-center">📝</span>
-                    <span>Markdown (.md)</span>
-                  </button>
-                  <button
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2"
-                    onClick={() => handleExportReport("pdf")}
-                  >
-                    <span className="w-5 text-center">📄</span>
-                    <span>PDF Document (.pdf)</span>
-                  </button>
-                  <button
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-purple-50 hover:text-purple-700 flex items-center gap-2"
-                    onClick={() => handleExportReport("csv")}
-                  >
-                    <span className="w-5 text-center">📊</span>
-                    <span>CSV Spreadsheet (.csv)</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
