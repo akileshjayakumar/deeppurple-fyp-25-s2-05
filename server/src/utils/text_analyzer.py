@@ -49,134 +49,55 @@ def analyze_text(text: str) -> Dict[str, Any]:
         # Create the LLM
         llm = get_openai_llm(temperature=0.2)
 
-        # Create the prompt template for analysis
+        # Improved system prompt for analysis
         prompt = ChatPromptTemplate.from_messages([
             SystemMessagePromptTemplate.from_template(
-                """You are DeepPurple, an expert text analysis system specializing in sentiment analysis, emotion detection, text summarization, topic modeling, and syntax analysis.
+                """
+You are DeepPurple, an expert AI system specialising in nuanced text analysis, including sentiment analysis, emotion detection, topic modelling, syntax analysis, and text summarisation.
 
-Your task is to analyze the provided text with precision and nuance, following these guidelines:
+Your task is to analyse any provided text in a comprehensive, insightful, and human-readable manner. Structure your analysis into clearly labelled sections using paragraphs and full sentences—not bullet points or JSON. For each section, write in a professional, objective, and forward-thinking tone. Your analysis must cover:
 
 1. SENTIMENT ANALYSIS:
-   - Evaluate the overall sentiment (positive, negative, neutral)
-   - Assign numerical scores (0.0-1.0) for each sentiment category
-   - Consider contextual cues, sarcasm, and implicit attitudes
-   - Identify sentiment shifts throughout the text
-
+   - Assess the overall sentiment (positive, negative, or neutral), referencing any sentiment shifts and supporting with evidence from the text. Be precise and explicit.
 2. EMOTION DETECTION:
-   - Identify the presence and intensity of six core emotions: joy, sadness, anger, fear, surprise, and disgust
-   - Assign numerical scores (0.0-1.0) for each emotion
-   - Determine the dominant emotion based on contextual significance, not just frequency
-   - Consider emotional triggers and responses in the text
+   - Identify the main emotions present (joy, sadness, anger, fear, surprise, disgust), indicate their intensity, and explain their contextual significance and triggers within the text.
+3. TOPIC MODELLING:
+   - Extract and explain 3-5 meaningful, non-overlapping key topics that represent the main themes, each with a concise label and supporting evidence.
+4. SYNTAX ANALYSIS:
+   - Comment on sentence structure, language style, and any notable grammatical or linguistic patterns that influence meaning, tone, or clarity.
+5. TEXT SUMMARISATION:
+   - Write a concise, stand-alone summary (1-2 paragraphs) capturing the essence, intent, and main details of the original text.
 
-3. TOPIC MODELING:
-   - Extract 3-5 distinct topics that represent the main themes
-   - Ensure topics are specific, meaningful, and non-overlapping
-   - Each topic should be labeled with a concise phrase (2-4 words)
-   - Topics should capture the essential subject matter, not just frequent terms
+Your output must be detailed, well-structured, and accessible to professionals and researchers seeking actionable insights. Do not use lists or JSON. Write in natural, fluent English. If the analysis is based on a user-uploaded text, ensure your observations are grounded in that text.
 
-4. TEXT SUMMARIZATION:
-   - Create a concise summary (1-3 paragraphs) that captures the key points
-   - Preserve the original meaning, intent, and tone
-   - Include critical details while eliminating redundancy
-   - Ensure the summary is coherent and stands alone
-
-5. SYNTAX ANALYSIS (implicit in your processing):
-   - Consider sentence structure, grammatical patterns, and linguistic features
-   - Use this understanding to refine your other analyses
-
-Be objective, accurate, and comprehensive in your analysis. Your output will be used for communication analysis, research, and decision-making.
+Be accurate, comprehensive, and never evasive. If a category is not relevant, briefly state why.
 """
             ),
             HumanMessagePromptTemplate.from_template(
-                """Analyze the following text enclosed between triple backticks:
+                """Please analyse the following text as described:
 
 ```
 {text}
 ```
-                
-Format your response as a JSON object with the following structure:
-{{
-    "sentiment": {{
-        "positive": 0.5,  // Replace with actual score between 0.0-1.0
-        "negative": 0.5,  // Replace with actual score between 0.0-1.0
-        "neutral": 0.5,   // Replace with actual score between 0.0-1.0
-        "overall": "neutral"   // Replace with "positive", "negative", or "neutral"
-    }},
-    "emotions": {{
-        "joy": 0.5,       // Replace with actual score between 0.0-1.0
-        "sadness": 0.5,   // Replace with actual score between 0.0-1.0
-        "anger": 0.5,     // Replace with actual score between 0.0-1.0
-        "fear": 0.5,      // Replace with actual score between 0.0-1.0
-        "surprise": 0.5,  // Replace with actual score between 0.0-1.0
-        "disgust": 0.5,   // Replace with actual score between 0.0-1.0
-        "dominant_emotion": "joy"  // Replace with the emotion with highest contextual significance
-    }},
-    "topics": [
-        {{
-            "name": "Example Topic",  // Replace with actual topic label (2-4 words)
-            "keywords": ["keyword1", "keyword2", "keyword3"]  // Replace with 3 representative keywords
-        }}
-        // Add more topics as needed, but ensure valid JSON format
-    ],
-    "summary": "This is a sample summary of the text."  // Replace with actual summary
-}}
-
-IMPORTANT: Your response must be valid JSON. Do not include any text outside the JSON object. Remove all comments and ensure proper JSON syntax.
-
-Ensure your response is valid JSON and follows this exact structure."""
+"""
             )
         ])
 
         # Create chain and execute
         chain = prompt | llm | StrOutputParser()
         response = chain.invoke({"text": text[:10000]})  # Limit text length
-        
-        # Log the response for debugging
+
         logger.debug(f"Raw response from OpenAI: {response[:500]}...")
-        
-        # Check if response is empty or not valid JSON
-        if not response or not response.strip():
-            logger.error("Empty response received from OpenAI")
-            return {
-                "sentiment": {"positive": 0.5, "negative": 0.5, "neutral": 0.5, "overall": "neutral"},
-                "emotions": {
-                    "joy": 0.0, "sadness": 0.0, "anger": 0.0, "fear": 0.0, 
-                    "surprise": 0.0, "disgust": 0.0, "dominant_emotion": "neutral"
-                },
-                "topics": [{"name": "No topics detected", "keywords": ["none", "none", "none"]}],
-                "summary": "Unable to analyze the provided text."
-            }
-        
-        try:
-            # Try to find JSON content in the response (in case there's extra text)
-            import re
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-                results = json.loads(json_str)
-            else:
-                # If no JSON pattern found, try the original response
-                results = json.loads(response)
-                
-            logger.debug("Successfully parsed analysis response")
-            return results
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parsing error: {str(e)}. Response: {response[:200]}...")
-            # Return a fallback response
-            return {
-                "sentiment": {"positive": 0.5, "negative": 0.5, "neutral": 0.5, "overall": "neutral"},
-                "emotions": {
-                    "joy": 0.0, "sadness": 0.0, "anger": 0.0, "fear": 0.0, 
-                    "surprise": 0.0, "disgust": 0.0, "dominant_emotion": "neutral"
-                },
-                "topics": [{"name": "Error in analysis", "keywords": ["error", "parsing", "failed"]}],
-                "summary": "There was an error analyzing the text. Please try again with different content."
-            }
+
+        # Return the natural language analysis as a string (not JSON)
+        return {"analysis": response.strip()}
 
     except Exception as e:
         logger.error(f"Error during text analysis: {str(e)}")
         logger.debug(traceback.format_exc())
-        raise
+        return {
+            "analysis": "Unable to analyse the provided text due to an internal error."
+        }
 
 
 def answer_question(question: str, context: str, conversation_history: List[Dict[str, str]] = None) -> Tuple[str, List[str]]:
@@ -193,43 +114,30 @@ def answer_question(question: str, context: str, conversation_history: List[Dict
     """
     try:
         logger.debug(f"Starting to answer question: '{question[:50]}...'")
-
-        # Build conversation history context if provided
         conversation_messages = []
         if conversation_history and len(conversation_history) > 0:
             for i, qa_pair in enumerate(conversation_history):
                 conversation_messages.append(f"User: {qa_pair['question']}")
                 conversation_messages.append(f"Assistant: {qa_pair['answer']}")
 
-        # Create the chat template
         system_message = SystemMessagePromptTemplate.from_template(
-            """You are DeepPurple, an AI assistant specializing in text analysis with expertise in sentiment analysis, emotion detection, text summarization, topic modeling, and syntax analysis.
+            """
+You are DeepPurple, an expert AI system specialising in nuanced text analysis, including sentiment analysis, emotion detection, topic modelling, syntax analysis, and text summarisation.
 
-Your primary goal is to help users analyze text and provide insights. When users upload files or provide text, you analyze the content and answer questions about it.
+Your task is to answer user questions by providing clear, structured, and in-depth analysis of any provided text. If a user provides text for analysis, apply your analytical skills as described below and base your answer strictly on the content. If the user simply asks a general question, answer naturally, drawing from your expertise, but do not mention missing context.
 
-When responding to users:
-1. Be conversational, helpful, and engaging
-2. If a user asks what you can do, explain your text analysis capabilities (sentiment analysis, emotion detection, etc.)
-3. If a user asks a general question without providing text to analyze:
-   - Answer naturally using your knowledge
-   - Don't mention "missing context" or suggest uploading files unless specifically asked
-   - Maintain a helpful tone focused on text analysis as your specialty
+Your analysis or answers should cover, as appropriate:
+- Sentiment analysis: clear, evidence-based assessment.
+- Emotion detection: main emotions and their triggers.
+- Topic modelling: key themes and supporting details.
+- Syntax analysis: any notable linguistic or grammatical features.
+- Text summarisation: concise, stand-alone summary.
 
-Your text analysis capabilities:
-- Sentiment Analysis: Detecting positive, negative, or neutral sentiment in text
-- Emotion Detection: Identifying emotions like joy, sadness, anger, fear, surprise, and disgust
-- Text Summarization: Creating concise summaries of longer content
-- Topic Modeling: Extracting key themes and topics from text
-- Interactive Q&A: Answering questions about analyzed text
+Present your response in labelled sections, using full sentences and paragraphs. Write in a professional, objective, and forward-thinking tone suitable for researchers and analysts.
 
-When text is provided for analysis:
-1. COMPREHENSION: Carefully analyze both the question and context
-2. REASONING: Use step-by-step reasoning for accurate answers
-3. VERIFICATION: Ensure your answer is directly supported by the context
-4. CITATION: Reference specific parts of the context when relevant
-5. CLARITY: Present information in a structured, easy-to-understand format
+Be comprehensive, accurate, and never evasive. Do not use lists, bullet points, or JSON.
 
-Always maintain a helpful, informative tone while prioritizing accuracy.
+If you reference the context, specify the sections you relied on at the end under "Sources:"; otherwise, state "General knowledge".
 """
         )
 
@@ -244,48 +152,34 @@ Context:
 
 Question: {question}
 
-Answer my question helpfully. If I've provided text to analyze, base your response on that text. If not, just answer naturally without mentioning the need for context.
-
-Format your response as follows:
-1. First provide your comprehensive answer
-2. Then on a new line after "Sources:", list the specific sections from the context that support your answer, or indicate "General knowledge" if using information outside the context. Only include this Sources section if I've provided text to analyze.
+Provide a detailed, insightful answer or analysis as described above. If I've provided text to analyse, ground your answer in that text.
 """
         )
 
-        chat_prompt = ChatPromptTemplate.from_messages(
-            [system_message, human_message])
+        chat_prompt = ChatPromptTemplate.from_messages([system_message, human_message])
 
-        # Prepare inputs
         inputs = {
             "question": question,
-            "context": context[:10000],  # Limit the context length
+            "context": context[:10000],
             "conversation_history": "\n".join(conversation_messages)
         }
 
-        # Create the LLM
         llm = get_openai_llm(temperature=0.2)
-
-        # Execute the chain
         chain = chat_prompt | llm | StrOutputParser()
         response = chain.invoke(inputs)
 
-        # Parse the response to extract answer and sources
+        # Split out Sources section if present
         answer = ""
         sources = []
-
-        # Simple parsing of the response format
         parts = response.split("Sources:", 1)
         if len(parts) > 1:
             answer = parts[0].strip()
             sources_text = parts[1].strip()
-            # Convert sources text to list
-            sources = [s.strip()
-                       for s in sources_text.split("\n") if s.strip()]
+            sources = [s.strip() for s in sources_text.split("\n") if s.strip()]
         else:
             answer = response
             sources = []
 
-        # If parsing failed, use the whole response as the answer
         if not answer:
             answer = response
 
@@ -312,42 +206,28 @@ async def answer_question_stream(question: str, context: str, conversation_histo
     try:
         logger.debug(f"Starting to stream answer for: '{question[:50]}...'")
 
-        # Build conversation history messages
         conversation_messages = []
         if conversation_history and len(conversation_history) > 0:
             for i, qa_pair in enumerate(conversation_history):
                 conversation_messages.append(f"User: {qa_pair['question']}")
                 conversation_messages.append(f"Assistant: {qa_pair['answer']}")
 
-        # Create the chat template
         system_message = SystemMessagePromptTemplate.from_template(
-            """You are DeepPurple, an AI assistant specializing in text analysis with expertise in sentiment analysis, emotion detection, text summarization, topic modeling, and syntax analysis.
+            """
+You are DeepPurple, an expert AI system specialising in nuanced text analysis, including sentiment analysis, emotion detection, topic modelling, syntax analysis, and text summarisation.
 
-Your primary goal is to help users analyze text and provide insights. When users upload files or provide text, you analyze the content and answer questions about it.
+Your task is to answer user questions by providing clear, structured, and in-depth analysis of any provided text. If a user provides text for analysis, apply your analytical skills as described below and base your answer strictly on the content. If the user simply asks a general question, answer naturally, drawing from your expertise, but do not mention missing context.
 
-When responding to users:
-1. Be conversational, helpful, and engaging
-2. If a user asks what you can do, explain your text analysis capabilities (sentiment analysis, emotion detection, etc.)
-3. If a user asks a general question without providing text to analyze:
-   - Answer naturally using your knowledge
-   - Don't mention "missing context" or suggest uploading files unless specifically asked
-   - Maintain a helpful tone focused on text analysis as your specialty
+Your analysis or answers should cover, as appropriate:
+- Sentiment analysis: clear, evidence-based assessment.
+- Emotion detection: main emotions and their triggers.
+- Topic modelling: key themes and supporting details.
+- Syntax analysis: any notable linguistic or grammatical features.
+- Text summarisation: concise, stand-alone summary.
 
-Your text analysis capabilities:
-- Sentiment Analysis: Detecting positive, negative, or neutral sentiment in text
-- Emotion Detection: Identifying emotions like joy, sadness, anger, fear, surprise, and disgust
-- Text Summarization: Creating concise summaries of longer content
-- Topic Modeling: Extracting key themes and topics from text
-- Interactive Q&A: Answering questions about analyzed text
+Present your response in labelled sections, using full sentences and paragraphs. Write in a professional, objective, and forward-thinking tone suitable for researchers and analysts.
 
-When text is provided for analysis:
-1. COMPREHENSION: Carefully analyze both the question and context
-2. REASONING: Use step-by-step reasoning for accurate answers
-3. VERIFICATION: Ensure your answer is directly supported by the context
-4. CITATION: Reference specific parts of the context when relevant
-5. CLARITY: Present information in a structured, easy-to-understand format
-
-Always maintain a helpful, informative tone while prioritizing accuracy.
+Be comprehensive, accurate, and never evasive. Do not use lists, bullet points, or JSON.
 """
         )
 
@@ -362,44 +242,35 @@ Context:
 
 Question: {question}
 
-Answer my question helpfully. If I've provided text to analyze, base your response on that text. If not, just answer naturally without mentioning the need for context.
+Provide a detailed, insightful answer or analysis as described above. If I've provided text to analyse, ground your answer in that text.
 """
         )
 
-        chat_prompt = ChatPromptTemplate.from_messages(
-            [system_message, human_message])
+        chat_prompt = ChatPromptTemplate.from_messages([system_message, human_message])
 
-        # Prepare inputs
         inputs = {
             "question": question,
-            "context": context[:10000],  # Limit the context length
+            "context": context[:10000],
             "conversation_history": "\n".join(conversation_messages)
         }
 
-        # Create the LLM with streaming enabled
         llm = get_openai_llm(temperature=0.2, streaming=True)
-
-        # Set up the streaming chain
         chain = chat_prompt | llm
 
-        # Use async iterator for streaming responses
         async for chunk in chain.astream(inputs):
             if hasattr(chunk, 'content'):
                 yield chunk.content
             elif isinstance(chunk, str):
                 yield chunk
             else:
-                # If the chunk is in a different format, try to extract content
                 try:
                     content = chunk.get('content', '')
                     if content:
                         yield content
                 except:
-                    # If we can't extract content, skip this chunk
                     pass
 
     except Exception as e:
         logger.error(f"Error streaming answer: {str(e)}")
         logger.debug(traceback.format_exc())
-        # Yield error message
         yield "I couldn't process your question due to a technical error. Please try again later."
