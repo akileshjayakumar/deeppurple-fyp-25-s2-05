@@ -1,0 +1,45 @@
+services:
+  deeppurple-client:
+    build:
+      context: ./client
+      dockerfile: build/Dockerfile
+    container_name: deeppurple-client
+    ports:
+      - "3000:80"
+    depends_on:
+      - deeppurple-server
+    restart: unless-stopped
+    volumes:
+      - ./client/src:/app/src
+      - ./client/public:/app/public
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_TELEMETRY_DISABLED=1
+    networks:
+      - deeppurple-network
+
+  deeppurple-server:
+    build:
+      context: ./server
+      dockerfile: build/Dockerfile
+    container_name: deeppurple-server
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./server/.env
+    environment:
+      - DEPLOYMENT_ENV=development
+      - USE_SQLITE=false
+      - DEBUG=true
+    restart: unless-stopped
+    volumes:
+      - ./server/src:/app
+    networks:
+      - deeppurple-network
+
+volumes:
+  postgres_data:
+
+networks:
+  deeppurple-network:
+    driver: bridge
