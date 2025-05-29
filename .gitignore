@@ -83,3 +83,4 @@ $RECYCLE.BIN/
 *.env.test.local
 *.env.production.local
 uploads/
+docker-compose.yml
