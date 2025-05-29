@@ -49,6 +49,7 @@ pip-delete-this-directory.txt
 
 # IDEs and Editors
 .vscode/
+.readme/
 .idea/
 *.sublime-project
 *.sublime-workspace
@@ -81,5 +82,4 @@ $RECYCLE.BIN/
 *.env.development.local
 *.env.test.local
 *.env.production.local
-readme/
 uploads/
