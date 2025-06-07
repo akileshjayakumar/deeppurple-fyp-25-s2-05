@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
+import { adminApi } from "@/lib/api";
 
 // Define types
 type UserType = {
@@ -26,27 +27,9 @@ type UpdateUserData = {
   is_active?: boolean;
 };
 
-// Direct API call without using adminApi to troubleshoot
 const fetchUsers = async (): Promise<{ items: UserType[]; total: number }> => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      throw new Error("No authentication token");
-    }
-
-    console.log("Fetching users directly...");
-    const response = await fetch("http://localhost:8000/admin/users", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log("User data:", data);
+    const data = await adminApi.getUsers();
     return data;
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -56,29 +39,7 @@ const fetchUsers = async (): Promise<{ items: UserType[]; total: number }> => {
 
 const deactivateUser = async (userId: number): Promise<UserType> => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      throw new Error("No authentication token");
-    }
-
-    console.log(`Deactivating user ${userId}...`);
-    const response = await fetch(
-      `http://localhost:8000/admin/users/${userId}/deactivate`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log("Deactivation response:", data);
+    const data = await adminApi.deactivateUser(String(userId));
     return data;
   } catch (error) {
     console.error("Error deactivating user:", error);
@@ -88,29 +49,7 @@ const deactivateUser = async (userId: number): Promise<UserType> => {
 
 const activateUser = async (userId: number): Promise<UserType> => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      throw new Error("No authentication token");
-    }
-
-    console.log(`Activating user ${userId}...`);
-    const response = await fetch(
-      `http://localhost:8000/admin/users/${userId}/activate`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log("Activation response:", data);
+    const data = await adminApi.activateUser(String(userId));
     return data;
   } catch (error) {
     console.error("Error activating user:", error);
@@ -123,30 +62,11 @@ const updateUser = async (
   updateData: UpdateUserData
 ): Promise<UserType> => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      throw new Error("No authentication token");
-    }
-
-    console.log(`Updating user ${userId} with:`, updateData);
-    const response = await fetch(
-      `http://localhost:8000/admin/users/${userId}`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updateData),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log("Update response:", data);
+    const data = await adminApi.updateUser(String(userId), {
+      fullName: updateData.full_name,
+      isAdmin: updateData.is_admin,
+      isActive: updateData.is_active,
+    });
     return data;
   } catch (error) {
     console.error("Error updating user:", error);
