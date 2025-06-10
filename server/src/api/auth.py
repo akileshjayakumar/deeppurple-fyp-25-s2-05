@@ -117,6 +117,9 @@ async def get_user_me(current_user: User = Depends(get_current_active_user)):
     This endpoint returns the profile information of the currently authenticated user.
     It requires a valid JWT token in the Authorization header.
     """
+    # Check if user is google authenticated
+    if current_user.google_id:
+        current_user.is_google = True
     return current_user
 
 

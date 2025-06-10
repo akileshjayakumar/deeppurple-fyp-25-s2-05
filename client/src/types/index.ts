@@ -6,6 +6,7 @@ export interface User {
   profile_picture?: string;
   is_active: boolean;
   is_admin: boolean;
+  is_google:boolean;
   user_tier: string;
   created_at: string;
 }

@@ -40,6 +40,7 @@ class UserResponse(UserBase):
     id: int
     is_active: bool
     is_admin: bool
+    is_google: bool = False
     user_tier: UserTier
     created_at: datetime
     updated_at: Optional[datetime] = None
