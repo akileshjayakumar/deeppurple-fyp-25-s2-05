@@ -132,15 +132,17 @@ export default function DashboardLayout({
 
   const renderNavItems = () => (
     <>
-      {navigation.map((item) => (
-        <NavItem
-          key={item.href}
-          icon={item.icon}
-          label={item.label}
-          href={item.href}
-          isActive={pathname === item.href}
-        />
-      ))}
+      {navigation.map((item) =>
+        item.href === "/admin" && !user?.is_admin ? null : (
+          <NavItem
+            key={item.href}
+            icon={item.icon}
+            label={item.label}
+            href={item.href}
+            isActive={pathname === item.href}
+          />
+        )
+      )}
     </>
   );
 
