@@ -290,16 +290,7 @@ export default function AdminPage() {
         </Card>
       )}
 
-      <div className="mt-4 text-sm text-gray-500">
-        <p>Debug Info:</p>
-        <pre>
-          {JSON.stringify(
-            { currentUser: user, userCount: users.length },
-            null,
-            2
-          )}
-        </pre>
-      </div>
+
     </div>
   );
 }
