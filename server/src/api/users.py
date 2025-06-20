@@ -158,7 +158,14 @@ async def change_password_post(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-
+    
+    # Check if user is authenticated via Google
+    if user.google_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change password for Google authenticated users"
+        )
+    
     # Verify current password
     if not user.hashed_password or not verify_password(password_update.current_password, user.hashed_password):
         raise HTTPException(

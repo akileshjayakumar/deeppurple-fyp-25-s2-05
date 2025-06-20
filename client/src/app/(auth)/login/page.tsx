@@ -171,22 +171,24 @@ export default function LoginPage() {
         </div>
 
         {/* Google Login */}
-        <div className="flex justify-center">
-          <GoogleLogin
-            onSuccess={onGoogleSubmit}
-            onError={() => {
-              toast.error("Google login failed. Please try again.", {
-                duration: 3000,
-                className: "animate-in fade-in-50 duration-300",
-              });
-            }}
-            shape="rectangular"
-            text="signin_with"
-            size="large"
-            theme="outline"
-            logo_alignment="center"
-            containerProps={{ style: { width: "100%" } }}
-          />
+        <div className="flex w-full justify-center items-center">
+          <div>
+            <GoogleLogin
+              onSuccess={onGoogleSubmit}
+              onError={() => {
+                toast.error("Google login failed. Please try again.", {
+                  duration: 3000,
+                  className: "animate-in fade-in-50 duration-300",
+                });
+              }}
+              shape="rectangular"
+              text="signin_with"
+              size="large"
+              theme="outline"
+              logo_alignment="center"
+              containerProps={{ style: { width: "auto" } }}
+            />
+          </div>
         </div>
       </div>
 
