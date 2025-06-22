@@ -38,6 +38,8 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [profileUpdateDialogOpen, setProfileUpdateDialogOpen] = useState(false);
+  const [passwordChangeDialogOpen, setPasswordChangeDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Generate user's initials for avatar fallback
@@ -109,7 +111,13 @@ export default function ProfilePage() {
       toast.error("Failed to update profile");
     } finally {
       setIsLoading(false);
+      setProfileUpdateDialogOpen(false);
     }
+  };
+
+  const handleProfileUpdateConfirmation = (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileUpdateDialogOpen(true);
   };
 
   const handleProfilePictureChange = async (
@@ -193,7 +201,25 @@ export default function ProfilePage() {
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
+      setPasswordChangeDialogOpen(false);
     }
+  };
+
+  const handlePasswordChangeConfirmation = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (newPassword !== confirmPassword) {
+      toast.error("New passwords don't match");
+      return;
+    }
+
+    // Basic client-side validation
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters long");
+      return;
+    }
+
+    setPasswordChangeDialogOpen(true);
   };
 
   const handleDeleteAccount = async () => {
@@ -281,7 +307,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <form onSubmit={handleUpdateProfile}>
+              <form onSubmit={handleProfileUpdateConfirmation}>
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="full-name">Full Name</Label>
@@ -309,7 +335,7 @@ export default function ProfilePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleChangePassword}>
+              <form onSubmit={handlePasswordChangeConfirmation}>
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="current-password">Current Password</Label>
@@ -400,6 +426,62 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Profile Update Confirmation Dialog */}
+      <Dialog open={profileUpdateDialogOpen} onOpenChange={setProfileUpdateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Profile Update</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to update your full name to "{fullName}"?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setProfileUpdateDialogOpen(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={(e) => handleUpdateProfile(e as any)}
+              disabled={isLoading}
+            >
+              {isLoading ? "Updating..." : "Yes, Update Profile"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Change Confirmation Dialog */}
+      {!user?.is_google && (
+        <Dialog open={passwordChangeDialogOpen} onOpenChange={setPasswordChangeDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Password Change</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to change your password? This will update your account security.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setPasswordChangeDialogOpen(false)}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={(e) => handleChangePassword(e as any)}
+                disabled={isLoading}
+              >
+                {isLoading ? "Changing..." : "Yes, Change Password"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
