@@ -18,7 +18,7 @@ from schemas import schemas
 from core.auth import get_current_active_user
 from core.database import get_db
 from models.models import User, Session as SessionModel, File, FileContent, Insight, Question
-from utils.text_analyzer import analyze_text, answer_question, answer_question_stream
+from utils.text_analyzer import analyze_text, answer_question, answer_question_stream,visualize_text
 from utils.logger import logger
 from core.config import settings
 from utils.s3 import upload_file_to_s3
@@ -1004,6 +1004,79 @@ async def ask_question_with_file(
             "conversation_history": conversation_history
         }
 
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error processing question with file: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing question with file: {str(e)}"
+        )
+
+
+@router.post("/question/with-file/visualize", response_model=schemas.QuestionDataVisualization)
+async def question_with_file_visualize(
+    session_id: str = Form(...),
+    current_user: User = Depends(get_current_active_user),
+     db: Session = Depends(get_db)
+):
+    """
+    This end point visualises the last file uploaded in a session
+    1. Verify the session belongs to the user
+    2. Retrieve the last file uploaded in the session
+    3. Call text analyzer to process the file content
+    4. Return the response with visualization data
+    5. If no file is found, return an error message
+
+    """
+    logger.info(
+        f"Processing question with visualization")
+
+    # # Verify session belongs to user
+    session = db.query(SessionModel).filter(
+        SessionModel.id == session_id,
+        SessionModel.user_id == current_user.id
+    ).first()
+
+    if not session:
+        logger.warning(
+            f"Session not found: {session_id} for user {current_user.id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+
+    try:
+        #* Get last file in session
+        last_file = db.query(File).filter(
+            File.session_id == session.id
+        ).order_by(File.created_at.desc()).first()
+        last_file_contents = db.query(FileContent).filter(
+            FileContent.file_id == last_file.id
+        ).first()
+        if not last_file:
+            # logger.warning(
+            #     f"No files found in session {session.id} for user {current_user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No files found in session"
+            )
+        logger.info(
+            f"Visualizing file for session")
+        try:
+            #* Call text analyzer to process the file content
+            analysis_results = await visualize_text(last_file_contents.content)
+            logger.info(f"Data visualization completed successfully")
+        except Exception as e:
+            logger.error(f"Error answering question: {str(e)}")
+            logger.error(traceback.format_exc())
+        
+
+        # Return the response with visualization
+        return analysis_results
+    
     except HTTPException:
         # Re-raise HTTP exceptions
         raise

@@ -5,7 +5,7 @@ import logging
 import traceback
 import asyncio
 from langchain_openai import ChatOpenAI
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 
 from core.config import settings
@@ -274,3 +274,139 @@ Provide a detailed, insightful answer or analysis as described above. If I've pr
         logger.error(f"Error streaming answer: {str(e)}")
         logger.debug(traceback.format_exc())
         yield "I couldn't process your question due to a technical error. Please try again later."
+
+
+async def visualize_text(text: str) -> Dict[str, Any]:
+    """
+    Generate a visual representation of the text content.
+
+    Args:
+        text: The text content to visualize
+
+    Returns:
+        Dict with visualization data
+    """
+    try:
+        logger.info("Starting text visualization")
+
+        llm = get_openai_llm(temperature=0.2)
+        prompt = ChatPromptTemplate.from_messages([
+            SystemMessagePromptTemplate.from_template(
+                """
+You are DeepPurple, an expert AI system specialising in nuanced text analysis, including sentiment analysis, emotion detection, topic modelling, syntax analysis, and text summarisation.
+
+Your task is to analyze the provided text and extract the following key metrics for visualization:
+1. **Sentiment Score**: Overall sentiment of the text (positive, negative, neutral
+2. **Emotion Distribution**: Percentage of main emotions present (joy, sadness, anger, fear, surprise, disgust).
+3. **Key Topics**: 3-5 main topics with their relevance scores.
+4. **Sentiment Intensity**: A numerical score representing the overall sentiment intensity (e.g., -1 to 1 scale).
+5. **Emotion Categories**: A breakdown of emotions into categories with their respective percentages.
+
+Your output should be structured as a JSON object with the following format if there is only 1 actor in the text like in a review or a single statement:
+```json 
+{{
+    "overview": {{
+        "sentiment_score": "positive/negative/neutral",
+        "emotion_distribution": {{
+            "joy": 0.2,
+            "sadness": 0.1,
+            "anger": 0.05,
+            "fear": 0.1,
+            "surprise": 0.15,
+            "disgust": 0.1
+        }},
+        "key_topics": [
+            {{"topic": "Topic 1", "relevance_score": 0.8}},
+            {{"topic": "Topic 2", "relevance_score": 0.6}}
+        ],
+        "sentiment_intensity": 0.75,
+        "emotion_categories": {{
+            "positive_emotions": ["joy", "surprise"],
+            "negative_emotions": ["sadness", "anger", "fear", "disgust"]
+        }}
+    }},
+    "actors": []
+}}
+
+if the text consist of multiple actors, It is imperative you provide both an overview of the text and a breakdown for each actor. The output should be structured as a JSON object with the following format:
+```json 
+{{
+    "overview": {{
+        "sentiment_score": "neutral",
+        "emotion_distribution": {{
+            "joy": 0.2,
+            "sadness": 0.1,
+            "anger": 0.05
+        }}
+        "key_topics": [
+            {{"topic": "General Topic 1", "relevance_score": 0.7}},
+            {{"topic": "General Topic 2", "relevance_score": 0.5}}
+        ],
+        "sentiment_intensity": 0.6,
+        "emotion_categories": {{
+            "positive_emotions": ["joy"],
+            "negative_emotions": ["sadness", "anger", "fear", "surprise"]
+        }}
+    }},
+    "actors": [
+        {{
+            "actor_name": "Actor 1",
+            "sentiment_score": "positive",
+            "emotion_distribution": {{
+                "joy": 0.3,
+                "sadness": 0.1,
+                "anger": 0.05,
+                "fear": 0.05,
+                "surprise": 0.2,
+                "disgust": 0.1
+            }},
+            "key_topics": [
+                {{"topic": "Topic A", "relevance_score": 0.9}},
+                {{"topic": "Topic B", "relevance_score": 0.7}}
+            ],
+            "sentiment_intensity": 0.8,
+            "emotion_categories": {{
+                "positive_emotions": ["joy", "surprise"],
+                "negative_emotions": ["sadness", "anger", "fear", "disgust"]
+            }}
+        }},
+        {{
+            "actor_name": "Actor 2",
+            "sentiment_score": "neutral",
+            "emotion_distribution": {{
+                "joy": 0.2,
+                "sadness": 0.2,
+                "anger": 0.1,
+                "fear": 0.1,
+                "surprise": 0.1,
+                "disgust": 0.1
+            }},
+            "key_topics": [
+                {{"topic": "Topic C", "relevance_score": 0.8}},
+                {{"topic": "Topic D", "relevance_score": 0.6}}
+            ],
+            "sentiment_intensity": 0.5,
+            "emotion_categories": {{
+                "positive_emotions": ["joy"],
+                "negative_emotions": ["sadness", "anger", "fear", "surprise", "disgust"]
+            }}
+        }}
+    ]
+}}
+"""),
+            HumanMessagePromptTemplate.from_template(
+"""Input Text:
+```
+{text}
+```              
+""")
+])
+
+        chain = prompt | llm | JsonOutputParser()
+        response = chain.invoke({"text": text[:10000]})  # Limit text length
+        return response
+
+    except Exception as e:
+        logger.error(f"Error during text visualization: {str(e)}")
+        logger.debug(traceback.format_exc())
+        return {"visualization": "Unable to visualize the provided text due to an internal error."} 

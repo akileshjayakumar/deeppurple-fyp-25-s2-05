@@ -268,6 +268,37 @@ class QuestionResponse(BaseModel):
     # Include history in response
     conversation_history: Optional[List[Dict[str, str]]] = None
 
+
+#* -------- File and Question Data Visualization Schemas -------- *#
+class Actor(BaseModel):
+    """
+    Schema for actor data in text visualization.
+    """
+    actor_name: str
+    sentiment_score: str
+    emotion_distribution: Dict[str, float]
+    key_topics: List[Dict[str, Any]]
+    sentiment_intensity: float
+    emotion_categories: Dict[str,List[str]]
+
+class Overview(BaseModel):
+    """
+    Schema for overview data in text visualization.
+    """
+    sentiment_score:str
+    emotion_distribution: Dict[str, float]
+    key_topics: List[Dict[str, Any]]
+    sentiment_intensity: float
+    emotion_categories: Dict[str,List[str]]
+
+
+class QuestionDataVisualization(BaseModel):
+    """
+    Schema for visualizing question data.
+    """
+    overview: Overview
+    actors: Optional[List[Actor]]
+
 # Search result schemas
 
 
