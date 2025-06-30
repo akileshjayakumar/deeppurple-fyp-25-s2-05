@@ -1015,7 +1015,7 @@ async def ask_question_with_file(
             detail=f"Error processing question with file: {str(e)}"
         )
 
-
+#TODO Rename this endpoint later, this is just for visualizing the last file uploaded in a session
 @router.post("/question/with-file/visualize", response_model=schemas.QuestionDataVisualization)
 async def question_with_file_visualize(
     session_id: str = Form(...),
@@ -1068,6 +1068,23 @@ async def question_with_file_visualize(
         try:
             #* Call text analyzer to process the file content
             analysis_results = await visualize_text(last_file_contents.content)
+
+            # Check if analysis results are valid
+            if not analysis_results:
+                logger.warning(
+                    f"No analysis results found for file {last_file.filename}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No analysis results found for file"
+                )
+            if "overview" not in analysis_results:
+                logger.warning(
+                    f"No overview found in analysis results for file {last_file.filename}")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No overview found in analysis results"
+                )
+            
             logger.info(f"Data visualization completed successfully")
         except Exception as e:
             logger.error(f"Error answering question: {str(e)}")

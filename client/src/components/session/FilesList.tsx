@@ -36,7 +36,7 @@ export function FilesList({ files, onFileChange }: FilesListProps) {
   };
 
   const getFileIcon = (file: FileInfo) => {
-    switch (file.type.toLowerCase()) {
+    switch (file.file_type.toLowerCase()) {
       case "pdf":
         return <FileText className="h-5 w-5 text-red-500" />;
       case "csv":
@@ -94,9 +94,9 @@ export function FilesList({ files, onFileChange }: FilesListProps) {
                 <div className="flex items-center space-x-2">
                   {getFileIcon(file)}
                   <div>
-                    <p className="text-sm font-medium">{file.name}</p>
+                    <p className="text-sm font-medium">{file.filename}</p>
                     <p className="text-xs text-muted-foreground">
-                      {file.type} · {formatFileSize(file.size)}
+                      {file.file_type} · {formatFileSize(file.file_size)}
                     </p>
                   </div>
                 </div>

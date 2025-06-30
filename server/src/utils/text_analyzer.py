@@ -393,6 +393,13 @@ if the text consist of multiple actors, It is imperative you provide both an ove
         }}
     ]
 }}
+
+If the text is irrelevant to your described function as deep purple or does not contain sufficient information for analysis, return an empty JSON object: 
+```json
+{{
+    "overview": {{}},
+    "actors": []
+}}
 """),
             HumanMessagePromptTemplate.from_template(
 """Input Text:
@@ -403,7 +410,7 @@ if the text consist of multiple actors, It is imperative you provide both an ove
 ])
 
         chain = prompt | llm | JsonOutputParser()
-        response = chain.invoke({"text": text[:10000]})  # Limit text length
+        response = chain.invoke({"text": text[:10000]})  # Limit text length   
         return response
 
     except Exception as e:

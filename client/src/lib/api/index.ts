@@ -195,6 +195,19 @@ export const analysisApi = {
     return response.data;
   },
 
+  visualizeLastFile: async (sessionId: string) => {
+    const response = await api.post(
+      'analysis/question/with-file/visualize',
+      {
+        session_id: sessionId,
+      },
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    )
+    return response.data;
+  },
+
   askQuestion: async (sessionId: string, question: string) => {
     try {
       const response = await api.post(

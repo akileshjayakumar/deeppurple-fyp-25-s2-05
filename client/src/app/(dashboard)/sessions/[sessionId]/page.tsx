@@ -536,10 +536,10 @@ export default function SessionDetailPage() {
                       <div className="flex items-center gap-3">
                         <FileText className="h-5 w-5 text-gray-500" />
                         <div>
-                          <p className="font-medium">{file.name}</p>
+                          <p className="font-medium">{file.filename}</p>
                           <p className="text-xs text-muted-foreground">
                             Uploaded{" "}
-                            {new Date(file.upload_date).toLocaleString()}
+                            {new Date(file.created_at).toLocaleString()}
                           </p>
                         </div>
                       </div>

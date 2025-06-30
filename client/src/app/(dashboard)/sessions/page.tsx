@@ -432,7 +432,7 @@ export default function SessionsPage() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() =>
-                          router.push(`/dashboard?session=${session.id}`)
+                          router.push(`/sessions/${session.id}`)
                         }
                       >
                         <FileText className="h-4 w-4 mr-2" />

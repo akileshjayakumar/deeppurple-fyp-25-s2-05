@@ -99,11 +99,11 @@ export interface ConversationResponse {
 // File-related interfaces
 export interface FileInfo {
   id: string;
-  name: string;
-  type: string;
-  size: number;
+  filename: string;
+  file_type: string;
+  file_size: number;
   session_id: string;
-  upload_date: string;
+  created_at: string;
   status: "processing" | "complete" | "error";
 }
 
