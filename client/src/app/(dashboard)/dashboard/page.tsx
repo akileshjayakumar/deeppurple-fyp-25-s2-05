@@ -43,12 +43,21 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { sessionApi, analysisApi, fileApi } from "@/lib/api";
 import { ExportOptions } from "@/components/session/ExportOptions";
+import { set } from "zod";
+
+
+// types
+import { QuestionDataVisualization } from "@/types";
+import { EmotionDistributionChart } from "@/components/session/EmotionDistributionChart";
 
 interface Message {
   id: string;
   content: string;
   role: "user" | "assistant" | "system";
   timestamp: Date;
+  chartData?: any;
+  chartType?: string;
+  showVisualizeButton?: boolean;
 }
 
 // This is the main dashboard component that will be wrapped with Suspense
@@ -328,7 +337,7 @@ function DashboardContent() {
             setMessages((prev) => 
               prev.map(msg => 
                 msg.id === aiMessageId 
-                  ? { ...msg, content: accumulatedResponse } 
+                  ? { ...msg, content: accumulatedResponse}
                   : msg
               )
             );
@@ -348,6 +357,18 @@ function DashboardContent() {
             handleUploadProgress
           );
           
+
+          // After successful upload and analysis, show the visualize button
+          // First remove visualize button from all other messages, then add to current message
+          // Avoid the situation where multiple messages have the visualize button -> Only the last file should be visualized
+          setMessages((prev) =>
+            prev.map(msg => 
+              msg.id === aiMessageId 
+                ? { ...msg, showVisualizeButton: true } // Show visualize button after processing
+                : { ...msg, showVisualizeButton: undefined } // Remove button from all other messages
+            )
+          );
+
           toast.success("File analyzed successfully");
         } catch (uploadError) {
           console.error("Error uploading and analyzing file:", uploadError);
@@ -409,6 +430,102 @@ function DashboardContent() {
     }
   };
 
+  // TODO: This currently does not get saved in the chat history at all as it is not tied to a specific question. It just visualizes the last file uploaded in the session one time. Need to look at existing session management and fit the message in there. This is a temporary implementation. ( VIZ IN CHAT )
+
+  // TODO: User uploads file -> visualize button appears -> user clicks visualize -> visualization is created -> response.overview.emotion_distribution is used to create a chart. 
+  const handleVisualizeClick = async (sessionId: string) => {
+    try {
+      // First hide the visualize button with animation
+      setMessages((prev) => {
+        const idx = [...prev].reverse().findIndex(
+          (msg) => msg.role === "assistant" && msg.showVisualizeButton
+        );
+        if (idx === -1) return prev;
+        const realIdx = prev.length - 1 - idx;
+        return prev.map((msg, index) =>
+          index === realIdx
+            ? { ...msg, showVisualizeButton: false } // Hide the button after triggering
+            : msg
+        );
+      });
+
+      // Wait for animation to complete, then remove button completely
+      setTimeout(() => {
+        setMessages((prev) => {
+          const idx = [...prev].reverse().findIndex(
+            (msg) => msg.role === "assistant" && msg.showVisualizeButton !== undefined
+          );
+          if (idx === -1) return prev;
+          const realIdx = prev.length - 1 - idx;
+          return prev.map((msg, index) =>
+            index === realIdx
+              ? { ...msg, showVisualizeButton: undefined } // Remove button completely
+              : msg
+          );
+        });
+      }, 300); // Match the transition duration
+
+      // Add a temporary loading message
+      const loadingMessageId = `loading-${Date.now()}`;
+      const loadingMessage: Message = {
+        id: loadingMessageId,
+        content: "Visualizing file...",
+        role: "assistant",
+        timestamp: new Date(),
+      };
+      
+      setMessages((prev) => [...prev, loadingMessage]);
+      setIsLoading(true);
+
+      // Trigger the visualization API call
+      const response: QuestionDataVisualization = await analysisApi.visualizeLastFile(sessionId);
+
+      // data check
+      if (!response || !response.overview || !response.overview.emotion_distribution) {
+        throw new Error("Invalid visualization data received");
+      }
+      console.log('Visualization API response:', response);
+      console.log('Emotion distribution:', response.overview.emotion_distribution);
+      
+      // Replace the loading message with the actual visualization result
+      setMessages((prev) => 
+        prev.map(msg => 
+          msg.id === loadingMessageId 
+            ? {
+                ...msg,
+                content: "Here is the visualization result:",
+                chartData: response.overview.emotion_distribution,
+                chartType: "emotion_distribution", // Assuming this is the type of chart
+                showVisualizeButton: undefined, // Remove button after visualization
+                timestamp: new Date(),
+              }
+            : msg
+        )
+      );
+      toast.success("Visualization created successfully");
+    } catch (error) {
+      console.error("Error triggering visualization:", error);
+      
+      // Replace loading message with error message
+      setMessages((prev) => 
+        prev.map(msg => 
+          msg.id && msg.id.startsWith('loading-') && msg.content === "Visualizing file..."
+            ? {
+                ...msg,
+                content: "Sorry, I couldn't visualize the file. Please try again.",
+                timestamp: new Date(),
+              }
+            : msg
+        )
+      );
+      
+      toast.error("Failed to visualize file");
+    }
+    finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setSelectedFile(e.target.files[0]);
@@ -448,12 +565,14 @@ function DashboardContent() {
       <div className="flex-1 overflow-y-auto mb-4 bg-white rounded-lg border p-4">
         <div className="space-y-4">
           {messages.map((message) => (
+            // This div wraps each message and aligns it based on the role
             <div
               key={message.id}
               className={`flex ${
                 message.role === "user" ? "justify-end" : "justify-start"
               }`}
             >
+              {/* Renders the AI profile pic */}
               {message.role !== "user" && (
                 <Avatar
                   className={
@@ -467,9 +586,12 @@ function DashboardContent() {
                   </AvatarFallback>
                 </Avatar>
               )}
-
               <div
-                className={`mx-2 rounded-lg p-4 max-w-[80%] ${
+                className={`mx-2 rounded-lg p-4 ${
+                  message.chartData && message.chartType === "emotion_distribution" 
+                    ? "max-w-[95%] min-w-[600px]" // Much wider for charts with minimum width
+                    : "max-w-[80%]" // Normal width for text
+                } ${
                   message.role === "user"
                     ? "bg-purple-600 text-white"
                     : message.role === "assistant"
@@ -477,15 +599,49 @@ function DashboardContent() {
                     : "bg-gray-100"
                 }`}
               >
+                {/* Message content */}
                 <div className="whitespace-pre-wrap">{message.content}</div>
+
+                {/* Render chart if available */}
+                {message.chartData && message.chartType === "emotion_distribution" && (
+                  <div className="mt-4">
+                    <EmotionDistributionChart data={message.chartData} />
+                  </div>
+                )}
+
+                {/* Footer of chat bubble */}
+              {message.role === "assistant" && message.showVisualizeButton !== undefined ? (
+                <div className="flex justify-between items-center text-xs opacity-70 mt-2 text-right">
+                  <Button
+                    variant="outline"
+                    className={
+                    `rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 border-0 transition-all duration-300 
+                    ${!message.showVisualizeButton ? 'opacity-0 scale-75 pointer-events-none' : 'opacity-100 scale-100'}`
+                  }
+                    size="sm"
+                    onClick={() => {
+                      handleVisualizeClick(currentSessionId as string);
+                    }}
+                  >
+                    Visualize File?
+                  </Button>
+                  <span>
+                    {message.timestamp.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              ) : (
                 <div className="text-xs opacity-70 mt-2 text-right">
                   {message.timestamp.toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
                 </div>
+              )}
               </div>
-
+              {/* Renders the User profile pic */}
               {message.role === "user" && (
                 <Avatar>
                   <AvatarFallback>U</AvatarFallback>

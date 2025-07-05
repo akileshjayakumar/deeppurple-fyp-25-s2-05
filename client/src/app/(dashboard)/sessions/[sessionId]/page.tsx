@@ -554,6 +554,7 @@ export default function SessionDetailPage() {
           </Card>
         </TabsContent>
 
+ {/* TODO: Insights chart */}
         <TabsContent value="insights" className="mt-0">
           <Card className="border shadow-sm">
             <CardHeader className="bg-white border-b">

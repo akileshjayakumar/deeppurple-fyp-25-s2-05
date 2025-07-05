@@ -12,6 +12,7 @@ import os
 import json
 import logging
 import datetime
+from datetime import timezone
 import magic
 
 from schemas import schemas
@@ -1020,7 +1021,7 @@ async def ask_question_with_file(
 async def question_with_file_visualize(
     session_id: str = Form(...),
     current_user: User = Depends(get_current_active_user),
-     db: Session = Depends(get_db)
+    db: Session = Depends(get_db)
 ):
     """
     This end point visualises the last file uploaded in a session
@@ -1084,7 +1085,20 @@ async def question_with_file_visualize(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="No overview found in analysis results"
                 )
-            
+
+            #! Currently this endpoint is being used on demand so it is not storing the analysis results. In fact only a small portion of the analysis is being used. (VIZ IN CHAT)
+            # # Store the analysis results
+            # new_insight = Insight(
+            #     session_id=session.id,
+            #     insight_type = "file_visualization",
+            #     value = json.dumps(analysis_results, ensure_ascii=False),
+            #     created_at = datetime.datetime.now(timezone.utc),
+            # )
+            # db.add(new_insight)
+            # db.commit()
+            # db.refresh(new_insight)
+
+            # logger.info(f"Analysis results stored in database with ID: {new_insight.id}")
             logger.info(f"Data visualization completed successfully")
         except Exception as e:
             logger.error(f"Error answering question: {str(e)}")

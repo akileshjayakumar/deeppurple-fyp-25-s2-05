@@ -170,7 +170,7 @@ class FileContent(Base):
     # Relationships
     file = relationship("File", back_populates="contents")
 
-
+# TODO: Update this model to enable the visualization system (INSIGHTS TAB)
 class Insight(Base):
     """
     Analysis insights extracted from files.
@@ -231,7 +231,7 @@ class Emotion(Base):
     # Relationships
     insight = relationship("Insight")
 
-
+# TODO: Update this model to enable the visualization system (VIZ IN CHAT)
 class Question(Base):
     """
     User questions about analyzed content.

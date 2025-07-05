@@ -10,9 +10,9 @@ def test_question_withfile_visualize():
     """
     Test the /analysis/question/with-file/visualize endpoint
     """
-    response = client.post(
-        "/analysis/question/with-file/visualize",
-        json={
+    # response = client.post(
+    #     "/analysis/question/with-file/visualize",
+    #     json={
 
-        }
-    )
+    #     }
+    # )

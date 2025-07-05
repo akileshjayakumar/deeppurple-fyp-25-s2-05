@@ -143,7 +143,8 @@ export const sessionApi = {
     const response = await api.delete(`/sessions/${sessionId}`);
     return response.data;
   },
-
+  
+  //TODO: update interfaces + frontend in the session details page (INSIGHTS TAB)
   getSessionInsights: async (sessionId: string) => {
     const response = await api.get(`/sessions/${sessionId}/insights`);
     return response.data;
@@ -195,16 +196,20 @@ export const analysisApi = {
     return response.data;
   },
 
+
+  // TODO: Add persistence to this, analysis results are currently not being saved
+
+  //TODO:  Make it so when the users clicks this, a new question row is added where question_text is "Visualize this file" etc..
   visualizeLastFile: async (sessionId: string) => {
+    const formData = new FormData();
+    formData.append("session_id", sessionId);
     const response = await api.post(
       'analysis/question/with-file/visualize',
+      formData,
       {
-        session_id: sessionId,
-      },
-      {
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "multipart/form-data" },
       }
-    )
+    );
     return response.data;
   },
 
