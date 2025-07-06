@@ -204,7 +204,7 @@ export const analysisApi = {
     const formData = new FormData();
     formData.append("session_id", sessionId);
     const response = await api.post(
-      'analysis/question/with-file/visualize',
+      'analysis/visualize/last-file',
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
@@ -212,6 +212,31 @@ export const analysisApi = {
     );
     return response.data;
   },
+
+  askVisualizeQuestion: async (
+    sessionId: string, 
+    question:string,
+    answer_text:string,
+    chart_data: string,
+    chart_type:string
+  ) => {
+    const formData = new FormData();
+    formData.append("session_id", sessionId);
+    formData.append("question", question);
+    formData.append("answer_text", answer_text);
+    formData.append("chart_data", chart_data);
+    formData.append("chart_type", chart_type);
+
+    const response = await api.post(
+      'analysis/question/visualize',
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+    return response.data;
+  },
+
 
   askQuestion: async (sessionId: string, question: string) => {
     try {

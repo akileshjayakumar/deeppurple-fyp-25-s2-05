@@ -135,6 +135,8 @@ class SessionMessage(BaseModel):
     session_id: int
     question_text: str
     answer_text: Optional[str] = None
+    chart_data: Optional[Any] = None  # Optional chart data for visualization
+    chart_type: Optional[str] = None  # Type of chart (bar, line,
     created_at: datetime
     answered_at: Optional[datetime] = None
 

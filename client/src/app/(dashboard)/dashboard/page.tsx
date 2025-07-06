@@ -77,6 +77,8 @@ function DashboardContent() {
       timestamp: new Date(),
     },
   ]);
+  const [visualizationData, setVisualizationData] = useState<QuestionDataVisualization | null>(null);
+  const [visualizationCacheKey, setVisualizationCacheKey] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -94,6 +96,10 @@ function DashboardContent() {
   useEffect(() => {
     const sessionId = searchParams.get('session');
     console.log('Session ID from URL:', sessionId);
+    
+    // Clear visualization cache when session changes
+    setVisualizationData(null);
+    setVisualizationCacheKey(null);
     
     if (sessionId) {
       // If a specific session ID is provided in the URL, load that session
@@ -159,6 +165,10 @@ function DashboardContent() {
       setIsLoading(true);
       console.log('Loading session:', sessionId);
       
+      // Clear visualization cache when loading a different session
+      setVisualizationData(null);
+      setVisualizationCacheKey(null);
+      
       // Fetch session details
       const session = await sessionApi.getSessionById(sessionId);
       console.log('Session details loaded:', session);
@@ -179,6 +189,8 @@ function DashboardContent() {
             timestamp: new Date(),
           }
         ];
+
+        console.log('Formatting messages from history:', messageHistory);
         
         // Add message history if available
         if (messageHistory && messageHistory.length > 0) {
@@ -200,6 +212,8 @@ function DashboardContent() {
                 id: `answer-${msg.id}`,
                 content: msg.answer_text,
                 role: "assistant",
+                chartData: msg.chart_data || undefined,
+                chartType: msg.chart_type || undefined,
                 timestamp: new Date(msg.answered_at || msg.created_at),
               });
             }
@@ -356,6 +370,10 @@ function DashboardContent() {
             handleToken,
             handleUploadProgress
           );
+
+          // After the file is uploaded and processed, we clear the last visualization as well as cachekey
+          setVisualizationData(null);
+          setVisualizationCacheKey(null);
           
 
           // After successful upload and analysis, show the visualize button
@@ -430,9 +448,6 @@ function DashboardContent() {
     }
   };
 
-  // TODO: This currently does not get saved in the chat history at all as it is not tied to a specific question. It just visualizes the last file uploaded in the session one time. Need to look at existing session management and fit the message in there. This is a temporary implementation. ( VIZ IN CHAT )
-
-  // TODO: User uploads file -> visualize button appears -> user clicks visualize -> visualization is created -> response.overview.emotion_distribution is used to create a chart. 
   const handleVisualizeClick = async (sessionId: string) => {
     try {
       // First hide the visualize button with animation
@@ -449,21 +464,19 @@ function DashboardContent() {
         );
       });
 
-      // Wait for animation to complete, then remove button completely
-      setTimeout(() => {
-        setMessages((prev) => {
-          const idx = [...prev].reverse().findIndex(
-            (msg) => msg.role === "assistant" && msg.showVisualizeButton !== undefined
-          );
-          if (idx === -1) return prev;
-          const realIdx = prev.length - 1 - idx;
-          return prev.map((msg, index) =>
-            index === realIdx
-              ? { ...msg, showVisualizeButton: undefined } // Remove button completely
-              : msg
-          );
-        });
-      }, 300); // Match the transition duration
+      // User sends message "Visualize this file"
+      const userMessageContent = "Visualize this file";
+      const aiMessageContent = "Here is the visualization result:";
+      const chartType = "emotion_distribution_radial_chart"; // Add more chart types later
+
+      const userMessage: Message
+        = {
+        id: `user-${Date.now()}`,
+        content: userMessageContent,
+        role: "user",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMessage]);
 
       // Add a temporary loading message
       const loadingMessageId = `loading-${Date.now()}`;
@@ -477,8 +490,21 @@ function DashboardContent() {
       setMessages((prev) => [...prev, loadingMessage]);
       setIsLoading(true);
 
-      // Trigger the visualization API call
-      const response: QuestionDataVisualization = await analysisApi.visualizeLastFile(sessionId);
+      // Check if cache data is available and not stale
+      const currentCacheKey = `session-${sessionId}`;
+      let response: QuestionDataVisualization;
+      
+      if (visualizationData && visualizationCacheKey === currentCacheKey) {
+        // Use cached data if it matches the current session
+        response = visualizationData;
+        console.log('Using cached visualization data for session:', sessionId);
+      } else {
+        // Fetch new data and cache it
+        console.log('Fetching new visualization data for session:', sessionId);
+        response = await analysisApi.visualizeLastFile(sessionId);
+        setVisualizationData(response);
+        setVisualizationCacheKey(currentCacheKey);
+      }
 
       // data check
       if (!response || !response.overview || !response.overview.emotion_distribution) {
@@ -493,16 +519,26 @@ function DashboardContent() {
           msg.id === loadingMessageId 
             ? {
                 ...msg,
-                content: "Here is the visualization result:",
+                content: aiMessageContent,
                 chartData: response.overview.emotion_distribution,
-                chartType: "emotion_distribution", // Assuming this is the type of chart
+                chartType: chartType, // Assuming this is the type of chart
                 showVisualizeButton: undefined, // Remove button after visualization
                 timestamp: new Date(),
               }
             : msg
         )
       );
-      toast.success("Visualization created successfully");
+
+      const visualize_save = await analysisApi.askVisualizeQuestion(
+        sessionId as string,
+        userMessageContent as string,
+        aiMessageContent as string,
+        JSON.stringify(response.overview.emotion_distribution),
+        chartType as string // Pass the emotion distribution data
+      )
+
+      console.log('Visualization saved:', visualize_save);
+      toast.success("Visualization created and saved successfully");
     } catch (error) {
       console.error("Error triggering visualization:", error);
       
@@ -588,7 +624,7 @@ function DashboardContent() {
               )}
               <div
                 className={`mx-2 rounded-lg p-4 ${
-                  message.chartData && message.chartType === "emotion_distribution" 
+                  message.chartData 
                     ? "max-w-[95%] min-w-[600px]" // Much wider for charts with minimum width
                     : "max-w-[80%]" // Normal width for text
                 } ${
@@ -603,7 +639,8 @@ function DashboardContent() {
                 <div className="whitespace-pre-wrap">{message.content}</div>
 
                 {/* Render chart if available */}
-                {message.chartData && message.chartType === "emotion_distribution" && (
+                {/* Emotion Distribution Radial Chart */}
+                {message.chartData && (message.chartType === "emotion_distribution_radial_chart") && (
                   <div className="mt-4">
                     <EmotionDistributionChart data={message.chartData} />
                   </div>

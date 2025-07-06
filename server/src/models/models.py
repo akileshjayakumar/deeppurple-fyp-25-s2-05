@@ -257,6 +257,8 @@ class Question(Base):
     session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False)
     question_text = Column(Text, nullable=False)
     answer_text = Column(Text, nullable=True)  # Null until answered
+    chart_data = Column(JSON, nullable=True)  # Optional chart data for visualization
+    chart_type = Column(String(50), nullable=True)  # Type of chart (bar, line, pie, etc.)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     answered_at = Column(DateTime(timezone=True), nullable=True)
 

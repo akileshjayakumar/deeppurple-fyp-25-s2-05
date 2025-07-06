@@ -18,8 +18,6 @@ export function EmotionDistributionChart({ data }: EmotionDistributionChartProps
         return <div className="text-red-500 p-4">No emotion distribution data available</div>;
     }
 
-    console.log('Chart data received:', data); // Debug log
-
     const chartData = Object.entries(data).map(
         ([emotion, value]) => ({ 
             emotion: emotion.charAt(0).toUpperCase() + emotion.slice(1), // Capitalize emotion names
@@ -27,11 +25,14 @@ export function EmotionDistributionChart({ data }: EmotionDistributionChartProps
         })
     );
 
-    console.log('Formatted chart data:', chartData); // Debug log
 
     return (
-        <div className="w-full h-80 border rounded-lg p-4 bg-gray-50 min-w-[500px]">
-            <ResponsiveContainer width="100%" height="100%">
+        <div className="w-full border rounded-lg p-4 bg-gray-50 min-w-[500px]">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 text-center">
+                Emotion Distribution
+            </h3>
+            <div className="w-full h-80">
+                <ResponsiveContainer width="100%" height="100%">
                 <RadarChart
                     cx="50%"
                     cy="50%"
@@ -55,6 +56,7 @@ export function EmotionDistributionChart({ data }: EmotionDistributionChartProps
                     />
                 </RadarChart>
             </ResponsiveContainer>
+            </div>
         </div>
     );
 };

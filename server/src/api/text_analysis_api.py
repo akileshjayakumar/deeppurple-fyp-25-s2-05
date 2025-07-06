@@ -1015,10 +1015,94 @@ async def ask_question_with_file(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing question with file: {str(e)}"
         )
+    
+@router.post("/question/visualize")
+async def visualize_question(
+    session_id:str = Form(...),
+    question: str = Form(...),
+    answer_text: str = Form(...),
+    chart_data: str = Form(...),
+    chart_type: str = Form(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    This is an endpoint to save the visualization question-answer pair 
+    in the database.
 
-#TODO Rename this endpoint later, this is just for visualizing the last file uploaded in a session
-@router.post("/question/with-file/visualize", response_model=schemas.QuestionDataVisualization)
-async def question_with_file_visualize(
+    There is an endpoint specifically for saving the visualization question and answer pair becaause it is different from the regular question-answer pairs.
+
+    The regular question-answer pair is saved into the database at the time of the question being asked and answered by the AI.
+
+    Visualization on the other hand has the file data analyzed by the AI and that analysis ,which contains data that can be used for multiple visualizations, is cached on the frontend. User then clicks a button to show a specific visualization of a subset of that data which is when we save it.
+
+    I DO NOT want to
+    1. Keep making calls to AI for every visualization when we can consolidate it into one call and proccess it on the front end
+    
+    2. For each question and answer pair, have the chart data be the entire super set of data instead of the relevant subset
+    """
+
+    logger.info(f"Processing visualization question for session {session_id}")
+
+    # Verify session belongs to user
+    session = db.query(SessionModel).filter(
+        SessionModel.id == session_id,
+        SessionModel.user_id == current_user.id
+    ).first()
+
+    if not session:
+        logger.warning(
+            f"Session not found: {session_id} for user {current_user.id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+    
+    # Validate chart data and type
+    if not chart_data or not chart_type:
+        logger.error("Chart data and type must be provided")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chart data and type must be provided"
+        )
+
+    # Parse json of chart_data
+    try:
+        chart_data = json.loads(chart_data)
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON for chart_data: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON format for chart_data"
+        )
+
+    # Create a new Question record for the visualization
+    question_record = Question(
+        session_id=session.id,
+        question_text=question,
+        answer_text= answer_text,  # Store chart data as answer text
+        chart_data=chart_data,  # Store chart data
+        chart_type=chart_type  # Store chart type
+    )
+    db.add(question_record)
+    db.commit()
+    db.refresh(question_record)
+
+    logger.info(f"Visualization question saved with ID: {question_record.id}")
+
+    return {
+        "message": "Visualization question saved successfully",
+        "question_id": question_record.id,
+        "question_text": question_record.question_text,
+        "answer_text": question_record.answer_text,
+        "chart_data": question_record.chart_data,
+        "chart_type": question_record.chart_type    
+    }
+    
+
+
+@router.post("/visualize/last-file", response_model=schemas.QuestionDataVisualization)
+async def visualize_last_file(
     session_id: str = Form(...),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -1058,8 +1142,8 @@ async def question_with_file_visualize(
             FileContent.file_id == last_file.id
         ).first()
         if not last_file:
-            # logger.warning(
-            #     f"No files found in session {session.id} for user {current_user.id}")
+            logger.warning(
+                f"No files found in session {session.id} for user {current_user.id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No files found in session"
@@ -1085,20 +1169,6 @@ async def question_with_file_visualize(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="No overview found in analysis results"
                 )
-
-            #! Currently this endpoint is being used on demand so it is not storing the analysis results. In fact only a small portion of the analysis is being used. (VIZ IN CHAT)
-            # # Store the analysis results
-            # new_insight = Insight(
-            #     session_id=session.id,
-            #     insight_type = "file_visualization",
-            #     value = json.dumps(analysis_results, ensure_ascii=False),
-            #     created_at = datetime.datetime.now(timezone.utc),
-            # )
-            # db.add(new_insight)
-            # db.commit()
-            # db.refresh(new_insight)
-
-            # logger.info(f"Analysis results stored in database with ID: {new_insight.id}")
             logger.info(f"Data visualization completed successfully")
         except Exception as e:
             logger.error(f"Error answering question: {str(e)}")

@@ -440,7 +440,6 @@ async def filter_sessions_by_emotion(
     return {"sessions": sessions, "total_count": total_count}
 
 
-# TODO: Update this to enable the visualization system, messages now must include chart data as well as chart_type (VIZ IN CHAT)
 @router.get("/{session_id}/messages", response_model=List[schemas.SessionMessage])
 async def list_session_messages(
     session_id: int,
