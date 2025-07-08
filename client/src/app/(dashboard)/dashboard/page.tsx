@@ -751,51 +751,65 @@ function DashboardContent() {
 
                 {/* Footer of chat bubble */}
               {message.role === "assistant" && message.showVisualizeButton !== undefined ? (
-                <div className = "flex justify-between items-center text-xs opacity-70 mt-2 text-right">
+                <div className = "flex justify-between items-center text-xs opacity-70 mt-2">
 
-                  {/* Visualize Button */}
-                  {(message.showVisualizeButton === true || message.showVisualizeButton === "hiding") && (
-                    <Button
-                      variant="outline"
-                      className={`rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 border-0 transition-all duration-150 ${
-                        message.showVisualizeButton === "hiding" ? "opacity-0 scale-95" : "opacity-100 scale-100"
-                      }`}
-                      size="sm"
-                      onClick={() => {
-                        handleVisualizeClick(currentSessionId as string);
-                      }}
-                      disabled={message.showVisualizeButton === "hiding"}
-                    >
-                      Visualize File?
-                    </Button>
-                  )}
-
-                  {/* Chart Type Buttons */}
-                  {message.showChartTypeButtons && (
-                    <div className="flex gap-2 flex-wrap">
+                  {/* Left side - Visualize Button or Chart Type Buttons */}
+                  <div className="flex gap-2 flex-wrap">
+                    {/* Visualize Button */}
+                    {(message.showVisualizeButton === true || message.showVisualizeButton === "hiding") && (
                       <Button
                         variant="outline"
-                        className="rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 border-0 transition-all duration-300"
+                        className={`rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 border-0 transition-all duration-150 ${
+                          message.showVisualizeButton === "hiding" ? "opacity-0 scale-95" : "opacity-100 scale-100"
+                        }`}
                         size="sm"
-                        onClick={()=> {
-                          handleChartTypeClick(currentSessionId as string, "emotion_distribution");
+                        onClick={() => {
+                          handleVisualizeClick(currentSessionId as string);
                         }}
-                        >
-                          Emotion Distribution
-                        </Button>
-                      <Button
-                        variant="outline"
-                        className="rounded-full bg-green-100 text-green-700 hover:bg-green-200 border-0 transition-all duration-300"
-                        size="sm"
-                        onClick={()=> {
-                          handleChartTypeClick(currentSessionId as string, "key_topics");
-                        }}
-                        >
-                          Key Topics
-                        </Button>
-                    </div>
-                  )};
+                        disabled={message.showVisualizeButton === "hiding"}
+                      >
+                        Visualize File?
+                      </Button>
+                    )}
 
+                    {/* Chart Type Buttons */}
+                    {message.showChartTypeButtons && (
+                      <>
+                        <Button
+                          variant="outline"
+                          className={`rounded-full border-0 transition-all duration-300 ${
+                            visualizationData 
+                              ? "bg-blue-100 text-blue-700 hover:bg-blue-200" 
+                              : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          }`}
+                          size="sm"
+                          onClick={()=> {
+                            handleChartTypeClick(currentSessionId as string, "emotion_distribution");
+                          }}
+                          disabled={!visualizationData || isFetchingVisDataRef.current}
+                          >
+                            Emotion Distribution
+                          </Button>
+                        <Button
+                          variant="outline"
+                          className={`rounded-full border-0 transition-all duration-300 ${
+                            visualizationData 
+                              ? "bg-green-100 text-green-700 hover:bg-green-200" 
+                              : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                          }`}
+                          size="sm"
+                          onClick={()=> {
+                            handleChartTypeClick(currentSessionId as string, "key_topics");
+                          }}
+                          disabled={!visualizationData || isFetchingVisDataRef.current}
+                          >
+                            Key Topics
+                          </Button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Right side - Timestamp */}
                   <span>
                     {message.timestamp.toLocaleTimeString([], {
                       hour: "2-digit",
