@@ -49,6 +49,7 @@ import { set } from "zod";
 // types
 import { QuestionDataVisualization } from "@/types";
 import { EmotionDistributionChart } from "@/components/session/EmotionDistributionChart";
+import { KeyTopicsBarChart } from "@/components/session/KeyTopicsBarChart";
 
 interface Message {
   id: string;
@@ -57,7 +58,8 @@ interface Message {
   timestamp: Date;
   chartData?: any;
   chartType?: string;
-  showVisualizeButton?: boolean;
+  showVisualizeButton?: boolean | "hiding";
+  showChartTypeButtons?: boolean;
 }
 
 // This is the main dashboard component that will be wrapped with Suspense
@@ -84,6 +86,8 @@ function DashboardContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isVisualizingRef = useRef(false); // Track if currently visualizing
+  const isFetchingVisDataRef = useRef(false); // Track if currently fetching visualization data
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -448,52 +452,87 @@ function DashboardContent() {
     }
   };
 
-  const handleVisualizeClick = async (sessionId: string) => {
-    try {
-      // First hide the visualize button with animation
+
+
+// * Visualization Functions
+  const hideVisualizeButton = () => {
+    // First, trigger the fade-out animation
+    setMessages((prev) => {
+      const idx = [...prev].reverse().findIndex(
+        (msg) => msg.role === "assistant" && msg.showVisualizeButton
+      );
+      if (idx === -1) return prev;
+      const realIdx = prev.length - 1 - idx;
+      return prev.map((msg, index) =>
+        index === realIdx
+          ? { ...msg, showVisualizeButton: "hiding" } // Set to "hiding" state for animation
+          : msg
+      );  
+    });
+
+    // After animation duration, actually hide the button and show chart type buttons
+    setTimeout(() => {
       setMessages((prev) => {
         const idx = [...prev].reverse().findIndex(
-          (msg) => msg.role === "assistant" && msg.showVisualizeButton
+          (msg) => msg.role === "assistant" && (msg.showVisualizeButton === "hiding" || msg.showVisualizeButton === true)
         );
         if (idx === -1) return prev;
         const realIdx = prev.length - 1 - idx;
         return prev.map((msg, index) =>
           index === realIdx
-            ? { ...msg, showVisualizeButton: false } // Hide the button after triggering
+            ? { ...msg, showVisualizeButton: false, showChartTypeButtons: true }
             : msg
-        );
+        );  
       });
+    }, 150);
+  }
 
-      // User sends message "Visualize this file"
-      const userMessageContent = "Visualize this file";
-      const aiMessageContent = "Here is the visualization result:";
-      const chartType = "emotion_distribution_radial_chart"; // Add more chart types later
-
-      const userMessage: Message
-        = {
-        id: `user-${Date.now()}`,
-        content: userMessageContent,
-        role: "user",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, userMessage]);
-
-      // Add a temporary loading message
-      const loadingMessageId = `loading-${Date.now()}`;
-      const loadingMessage: Message = {
-        id: loadingMessageId,
-        content: "Visualizing file...",
-        role: "assistant",
-        timestamp: new Date(),
-      };
+  const handleVisualizeClick = async (sessionId: string) => {
+    // Check if already processing to prevent spam
+    if (isFetchingVisDataRef.current) {
+      toast.error("Please wait for the visualization data to finish loading");
+      return;
+    }
+    
+    try {
+      toast.info("Loading visualization data...");
+      isFetchingVisDataRef.current = true; // Set flag to indicate fetching visualization data is in progress
       
-      setMessages((prev) => [...prev, loadingMessage]);
-      setIsLoading(true);
+      // First hide the visualize button with animation
+      hideVisualizeButton();
+      
+      // Fetch the visualization data when the button is clicked
+      await fetchVisualizationData(sessionId);
+      
+      toast.success("Visualization data loaded successfully!");
+      
+    } catch (error) {
+      console.error("Error fetching visualization data:", error);
+      toast.error("Failed to load visualization data");
+      
+      // If there's an error, we should show the visualize button again
+      setMessages((prev) => {
+        const idx = [...prev].reverse().findIndex(
+          (msg) => msg.role === "assistant" && msg.showChartTypeButtons
+        );
+        if (idx === -1) return prev;
+        const realIdx = prev.length - 1 - idx;
+        return prev.map((msg, index) =>
+          index === realIdx
+            ? { ...msg, showVisualizeButton: true, showChartTypeButtons: false }
+            : msg
+        );  
+      });
+    } finally {
+      isFetchingVisDataRef.current = false; // Reset flag when done
+    }
+  };
 
-      // Check if cache data is available and not stale
+  const fetchVisualizationData = async (sessionId: string) => {
+    try {
       const currentCacheKey = `session-${sessionId}`;
       let response: QuestionDataVisualization;
-      
+
       if (visualizationData && visualizationCacheKey === currentCacheKey) {
         // Use cached data if it matches the current session
         response = visualizationData;
@@ -501,67 +540,127 @@ function DashboardContent() {
       } else {
         // Fetch new data and cache it
         console.log('Fetching new visualization data for session:', sessionId);
+        setIsLoading(true);
         response = await analysisApi.visualizeLastFile(sessionId);
         setVisualizationData(response);
         setVisualizationCacheKey(currentCacheKey);
       }
 
-      // data check
+      // Check if the response contains valid data
       if (!response || !response.overview || !response.overview.emotion_distribution) {
         throw new Error("Invalid visualization data received");
       }
-      console.log('Visualization API response:', response);
-      console.log('Emotion distribution:', response.overview.emotion_distribution);
-      
-      // Replace the loading message with the actual visualization result
-      setMessages((prev) => 
-        prev.map(msg => 
-          msg.id === loadingMessageId 
-            ? {
-                ...msg,
-                content: aiMessageContent,
-                chartData: response.overview.emotion_distribution,
-                chartType: chartType, // Assuming this is the type of chart
-                showVisualizeButton: undefined, // Remove button after visualization
-                timestamp: new Date(),
-              }
-            : msg
-        )
-      );
 
-      const visualize_save = await analysisApi.askVisualizeQuestion(
-        sessionId as string,
-        userMessageContent as string,
-        aiMessageContent as string,
-        JSON.stringify(response.overview.emotion_distribution),
-        chartType as string // Pass the emotion distribution data
-      )
-
-      console.log('Visualization saved:', visualize_save);
-      toast.success("Visualization created and saved successfully");
-    } catch (error) {
-      console.error("Error triggering visualization:", error);
-      
-      // Replace loading message with error message
-      setMessages((prev) => 
-        prev.map(msg => 
-          msg.id && msg.id.startsWith('loading-') && msg.content === "Visualizing file..."
-            ? {
-                ...msg,
-                content: "Sorry, I couldn't visualize the file. Please try again.",
-                timestamp: new Date(),
-              }
-            : msg
-        )
-      );
-      
-      toast.error("Failed to visualize file");
+      return response;
     }
-    finally {
+    catch (error) {
+      console.error("Error fetching visualization data:", error);
+      toast.error("Failed to fetch visualization data");
+      throw error; // Re-throw to handle in the main function
+    }
+    finally
+    {
       setIsLoading(false);
     }
   };
 
+  const handleChartTypeClick = async (sessionId: string, chartType: string) => {
+
+    if (isFetchingVisDataRef.current) {
+      toast.error("Visualization data has not yet loaded, please wait..");
+      return;
+    }
+
+    if (isVisualizingRef.current) {
+      toast.error("Please wait for the current visualization to finish");
+      return;
+    }
+    isVisualizingRef.current = true; // Set flag to indicate visualization is in progress
+
+
+    try {
+      // User sends message based on chart type
+      const formattedChartType = chartType.replace(/_/g, " ");
+      const userMessageContent = `Show me the ${formattedChartType} chart for the last file uploaded.`;
+      const aiMessageContent = `Here is the ${formattedChartType} chart for the last file uploaded.`;
+
+      const userMessage: Message = {
+        id: `user-${Date.now()}`,
+        content: userMessageContent,
+        role: "user",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMessage]);
+
+      // Add Loading message
+      const loadingMessage: Message = {
+        id: `loading-${Date.now()}`,
+        content: "Loading chart data...",
+        role: "assistant",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, loadingMessage]);
+      setIsLoading(true);
+
+      // Use cached visualization data (should already be loaded from handleVisualizeClick)
+      const response = visualizationData;
+      if (!response || !response.overview || !response.overview.emotion_distribution || !response.overview.key_topics) {
+        throw new Error("Visualization data not available. Please try clicking 'Visualize File?' again.");
+      }
+
+      // Update the loading message with the chart data
+      let chartData;
+      if (chartType === "emotion_distribution") {
+        chartData = response.overview.emotion_distribution;
+      } else if (chartType === "key_topics") {
+        chartData = response.overview.key_topics;
+      }
+      else {
+        throw new Error("Unsupported chart type");
+      }
+
+      console.log(`Chart data for ${chartType}:`, chartData);
+      const chartMessage: Message = {
+        id: `chart-${Date.now()}`,
+        content: aiMessageContent,
+        role: "assistant",
+        chartData: chartData,
+        chartType: chartType,
+        showVisualizeButton: false, // Hide visualize button for this message
+        showChartTypeButtons: false, // Hide chart type buttons for this message
+        timestamp: new Date(),
+      };
+
+      // Replace the loading message with the chart message
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === loadingMessage.id ? chartMessage : msg
+        )
+      );
+
+      // Save to backend
+      await analysisApi.askVisualizeQuestion(
+        sessionId,
+        userMessageContent,
+        aiMessageContent,
+        JSON.stringify(chartData),
+        chartType
+      );
+
+
+      toast.success(`Successfully visualized ${chartType}`);
+    } catch (error) {
+      console.error("Error handling chart type click:", error);
+      toast.error("Failed to handle chart type click");
+      return;
+    }
+    finally {
+      isVisualizingRef.current = false; // Reset flag when done
+      setIsLoading(false);
+    }
+  };
+
+  //* File Upload and Input Handling
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setSelectedFile(e.target.files[0]);
@@ -575,10 +674,8 @@ function DashboardContent() {
     }
   };
 
-  // Removed handleNewChat function as users should now use the New Session button in the sidebar
-  
 
-
+  //* Component Render
   // Console log for debugging during build
   console.log('Rendering dashboard content, sessionId:', currentSessionId);
   
@@ -640,28 +737,65 @@ function DashboardContent() {
 
                 {/* Render chart if available */}
                 {/* Emotion Distribution Radial Chart */}
-                {message.chartData && (message.chartType === "emotion_distribution_radial_chart") && (
+                {message.chartData && (message.chartType === "emotion_distribution") && (
                   <div className="mt-4">
                     <EmotionDistributionChart data={message.chartData} />
+                  </div>
+                )}
+                {/* Key Topics Bar Chart */}
+                {message.chartData && (message.chartType === "key_topics") && (
+                  <div className="mt-4">
+                    <KeyTopicsBarChart data={message.chartData} />
                   </div>
                 )}
 
                 {/* Footer of chat bubble */}
               {message.role === "assistant" && message.showVisualizeButton !== undefined ? (
-                <div className="flex justify-between items-center text-xs opacity-70 mt-2 text-right">
-                  <Button
-                    variant="outline"
-                    className={
-                    `rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 border-0 transition-all duration-300 
-                    ${!message.showVisualizeButton ? 'opacity-0 scale-75 pointer-events-none' : 'opacity-100 scale-100'}`
-                  }
-                    size="sm"
-                    onClick={() => {
-                      handleVisualizeClick(currentSessionId as string);
-                    }}
-                  >
-                    Visualize File?
-                  </Button>
+                <div className = "flex justify-between items-center text-xs opacity-70 mt-2 text-right">
+
+                  {/* Visualize Button */}
+                  {(message.showVisualizeButton === true || message.showVisualizeButton === "hiding") && (
+                    <Button
+                      variant="outline"
+                      className={`rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 border-0 transition-all duration-150 ${
+                        message.showVisualizeButton === "hiding" ? "opacity-0 scale-95" : "opacity-100 scale-100"
+                      }`}
+                      size="sm"
+                      onClick={() => {
+                        handleVisualizeClick(currentSessionId as string);
+                      }}
+                      disabled={message.showVisualizeButton === "hiding"}
+                    >
+                      Visualize File?
+                    </Button>
+                  )}
+
+                  {/* Chart Type Buttons */}
+                  {message.showChartTypeButtons && (
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        className="rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 border-0 transition-all duration-300"
+                        size="sm"
+                        onClick={()=> {
+                          handleChartTypeClick(currentSessionId as string, "emotion_distribution");
+                        }}
+                        >
+                          Emotion Distribution
+                        </Button>
+                      <Button
+                        variant="outline"
+                        className="rounded-full bg-green-100 text-green-700 hover:bg-green-200 border-0 transition-all duration-300"
+                        size="sm"
+                        onClick={()=> {
+                          handleChartTypeClick(currentSessionId as string, "key_topics");
+                        }}
+                        >
+                          Key Topics
+                        </Button>
+                    </div>
+                  )};
+
                   <span>
                     {message.timestamp.toLocaleTimeString([], {
                       hour: "2-digit",
