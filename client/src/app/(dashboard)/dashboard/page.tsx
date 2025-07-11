@@ -220,10 +220,10 @@ function DashboardContent() {
     }
 
     // If only a file is selected with no question, prompt for a question
-    if (selectedFile && !inputValue.trim()) {
-      toast.info("Please enter a question about this file");
-      return;
-    }
+    // if (selectedFile && !inputValue.trim()) {
+    //   toast.info("Please enter a question about this file");
+    //   return;
+    // }
 
     // Get the current session or create one if needed
     let sessionId = currentSessionId;
