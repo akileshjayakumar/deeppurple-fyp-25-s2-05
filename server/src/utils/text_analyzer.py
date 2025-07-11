@@ -337,7 +337,7 @@ if the text consist of multiple actors, It is imperative you provide both an ove
             "joy": 0.2,
             "sadness": 0.1,
             "anger": 0.05
-        }}
+        }},
         "key_topics": [
             {{"topic": "General Topic 1", "relevance_score": 0.7}},
             {{"topic": "General Topic 2", "relevance_score": 0.5}}
