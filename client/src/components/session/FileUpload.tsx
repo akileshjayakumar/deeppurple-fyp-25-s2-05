@@ -112,8 +112,12 @@ export function FileUpload({ onFileUploaded }: FileUploadProps) {
     } catch (error: any) {
       console.error("Error uploading file:", error);
 
-      // Provide more specific error messages based on the error
-      if (error.response?.status === 413) {
+      // Prefer backend error message if available
+      if (error.response?.data && typeof error.response.data === "object" && error.response.data.detail) {
+        toast.error(error.response.data.detail);
+      } else if (error.response?.data && typeof error.response.data === "string") {
+        toast.error(error.response.data);
+      } else if (error.response?.status === 413) {
         toast.error(
           "File is too large. Please upload a smaller file (max 10MB)."
         );
@@ -127,7 +131,7 @@ export function FileUpload({ onFileUploaded }: FileUploadProps) {
         );
       } else {
         toast.error(
-          "Failed to upload file. Please ensure the file is valid and try again."
+          error.message || "Failed to upload file. Please ensure the file is valid and try again."
         );
       }
     } finally {
