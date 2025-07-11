@@ -143,7 +143,8 @@ export const sessionApi = {
     const response = await api.delete(`/sessions/${sessionId}`);
     return response.data;
   },
-
+  
+  //TODO: update interfaces + frontend in the session details page (INSIGHTS TAB)
   getSessionInsights: async (sessionId: string) => {
     const response = await api.get(`/sessions/${sessionId}/insights`);
     return response.data;
@@ -194,6 +195,48 @@ export const analysisApi = {
     );
     return response.data;
   },
+
+
+  // TODO: Add persistence to this, analysis results are currently not being saved
+
+  //TODO:  Make it so when the users clicks this, a new question row is added where question_text is "Visualize this file" etc..
+  visualizeLastFile: async (sessionId: string) => {
+    const formData = new FormData();
+    formData.append("session_id", sessionId);
+    const response = await api.post(
+      'analysis/visualize/last-file',
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+    return response.data;
+  },
+
+  askVisualizeQuestion: async (
+    sessionId: string, 
+    question:string,
+    answer_text:string,
+    chart_data: string,
+    chart_type:string
+  ) => {
+    const formData = new FormData();
+    formData.append("session_id", sessionId);
+    formData.append("question", question);
+    formData.append("answer_text", answer_text);
+    formData.append("chart_data", chart_data);
+    formData.append("chart_type", chart_type);
+
+    const response = await api.post(
+      'analysis/question/visualize',
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+    return response.data;
+  },
+
 
   askQuestion: async (sessionId: string, question: string) => {
     try {

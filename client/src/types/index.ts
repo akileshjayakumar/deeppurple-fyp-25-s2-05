@@ -83,6 +83,39 @@ export interface TextAnalysisResult {
   summary: string;
 }
 
+// * Visualization-related interfaces 
+
+export interface Actor {
+  /**
+   * Schema for actor data in text visualization.
+   */
+  actor_name: string;
+  sentiment_score: string;
+  emotion_distribution: { [emotion: string]: number };
+  key_topics: Array<{ [key: string]: any }>;
+  sentiment_intensity: number;
+  emotion_categories: { [category: string]: string[] };
+}
+
+export interface Overview {
+  /**
+   * Schema for overview data in text visualization.
+   */
+  sentiment_score: string;
+  emotion_distribution: { [emotion: string]: number };
+  key_topics: Array<{ [key: string]: any }>;
+  sentiment_intensity: number;
+  emotion_categories: { [category: string]: string[] };
+}
+
+export interface QuestionDataVisualization {
+  /**
+   * Schema for visualizing question data.
+   */
+  overview: Overview;
+  actors?: Actor[];
+}
+
 export interface ConversationMessage {
   id: string;
   session_id: string;
@@ -99,11 +132,11 @@ export interface ConversationResponse {
 // File-related interfaces
 export interface FileInfo {
   id: string;
-  name: string;
-  type: string;
-  size: number;
+  filename: string;
+  file_type: string;
+  file_size: number;
   session_id: string;
-  upload_date: string;
+  created_at: string;
   status: "processing" | "complete" | "error";
 }
 

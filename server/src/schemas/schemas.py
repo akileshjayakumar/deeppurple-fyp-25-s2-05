@@ -135,6 +135,8 @@ class SessionMessage(BaseModel):
     session_id: int
     question_text: str
     answer_text: Optional[str] = None
+    chart_data: Optional[Any] = None  # Optional chart data for visualization
+    chart_type: Optional[str] = None  # Type of chart (bar, line,
     created_at: datetime
     answered_at: Optional[datetime] = None
 
@@ -267,6 +269,37 @@ class QuestionResponse(BaseModel):
     sources: List[str]
     # Include history in response
     conversation_history: Optional[List[Dict[str, str]]] = None
+
+
+#* -------- File and Question Data Visualization Schemas -------- *#
+class Actor(BaseModel):
+    """
+    Schema for actor data in text visualization.
+    """
+    actor_name: str
+    sentiment_score: str
+    emotion_distribution: Dict[str, float]
+    key_topics: List[Dict[str, Any]]
+    sentiment_intensity: float
+    emotion_categories: Dict[str,List[str]]
+
+class Overview(BaseModel):
+    """
+    Schema for overview data in text visualization.
+    """
+    sentiment_score:str
+    emotion_distribution: Dict[str, float]
+    key_topics: List[Dict[str, Any]]
+    sentiment_intensity: float
+    emotion_categories: Dict[str,List[str]]
+
+
+class QuestionDataVisualization(BaseModel):
+    """
+    Schema for visualizing question data.
+    """
+    overview: Overview
+    actors: Optional[List[Actor]]
 
 # Search result schemas
 

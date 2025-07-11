@@ -218,7 +218,7 @@ async def list_session_files(
 
     return files
 
-
+# TODO: update this endpoint for the new visualization system (INSIGHTS TAB)
 @router.get("/{session_id}/insights", response_model=List[schemas.InsightResponse])
 async def list_session_insights(
     session_id: int,
@@ -438,7 +438,6 @@ async def filter_sessions_by_emotion(
         skip).limit(limit).all()
 
     return {"sessions": sessions, "total_count": total_count}
-
 
 
 @router.get("/{session_id}/messages", response_model=List[schemas.SessionMessage])

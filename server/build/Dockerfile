@@ -15,7 +15,8 @@ COPY build/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
-COPY src/ /app/
+COPY src/ /app/ 
+COPY tests/ /app/tests/
 
 # Use .env file for environment variables
 ENV PYTHONPATH=/app
