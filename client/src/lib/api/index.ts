@@ -197,9 +197,7 @@ export const analysisApi = {
   },
 
 
-  // TODO: Add persistence to this, analysis results are currently not being saved
 
-  //TODO:  Make it so when the users clicks this, a new question row is added where question_text is "Visualize this file" etc..
   visualizeLastFile: async (sessionId: string) => {
     const formData = new FormData();
     formData.append("session_id", sessionId);

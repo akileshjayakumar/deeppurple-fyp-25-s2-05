@@ -512,11 +512,20 @@ async def export_session_to_csv(
             "role": "user",
             "content": msg.question_text
         })
-        if msg.answer_text:
+
+        # Include chart data only if available -> Visualization message
+        if msg.chart_data:
+            data.append({
+                "timestamp": msg.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "role": "assistant",
+                "content": msg.chart_type + ": " + json.dumps(msg.chart_data),
+            })
+
+        elif msg.answer_text:
             data.append({
                 "timestamp": msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 "role": "assistant",
-                "content": msg.answer_text
+                "content": msg.answer_text,
             })
 
     df = pd.DataFrame(data)
@@ -575,9 +584,15 @@ async def export_session_to_markdown(
         # Add user question
         md_content += f"## User ({msg.created_at.strftime('%Y-%m-%d %H:%M:%S')})\n\n"
         md_content += f"{msg.question_text}\n\n"
+
+        # Include chart data if available
+        if msg.chart_data:
+            md_content += f"## Visualization: {msg.chart_type} ({msg.created_at.strftime('%Y-%m-%d %H:%M:%S')})\n\n"
+            md_content += f"```json\n{json.dumps(msg.chart_data, indent=2)}\n```\n\n"
+            md_content += "---\n\n"
         
         # Add assistant response if available
-        if msg.answer_text:
+        elif msg.answer_text:
             timestamp = msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
             md_content += f"## Assistant ({timestamp})\n\n"
             md_content += f"{msg.answer_text}\n\n"
@@ -645,8 +660,18 @@ async def export_session_to_pdf(
         elements.append(Paragraph(msg.question_text, styles["Normal"]))
         elements.append(Spacer(1, 12))
         
+        # TODO: Currently just dumps chart data as JSON in PDF, change to actual chart image later
+        # Include chart data if available
+        if msg.chart_data:
+            # Add visualization message
+            elements.append(Paragraph(f"<b>Visualization: {msg.chart_type}</b> ({msg.created_at.strftime('%Y-%m-%d %H:%M:%S')})", styles["Heading2"]))
+            elements.append(Paragraph(json.dumps(msg.chart_data, indent=2), styles["Normal"]))
+            elements.append(Spacer(1, 12))
+            elements.append(Paragraph("<hr/>", styles["Normal"]))
+            elements.append(Spacer(1, 12))
+        
         # Add assistant response if available
-        if msg.answer_text:
+        elif msg.answer_text:
             timestamp = msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
             elements.append(Paragraph(f"<b>Assistant</b> ({timestamp})", styles["Heading2"]))
             elements.append(Paragraph(msg.answer_text, styles["Normal"]))
