@@ -245,12 +245,13 @@ function DashboardContent() {
       toast.error("Please enter a question or upload a file");
       return;
     }
+    if (isLoading) {
+      toast.info("Please wait for the current request to finish");
+      return;
+    }
 
-    // If only a file is selected with no question, prompt for a question
-    // if (selectedFile && !inputValue.trim()) {
-    //   toast.info("Please enter a question about this file");
-    //   return;
-    // }
+    // for debouncing
+    setIsLoading(true);
 
     // Get the current session or create one if needed
     let sessionId = currentSessionId;
@@ -320,7 +321,6 @@ function DashboardContent() {
 
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
-    setIsLoading(true);
 
     // Save current input and file for processing
     const currentInput = inputValue;
