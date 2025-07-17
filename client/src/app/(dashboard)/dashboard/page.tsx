@@ -293,10 +293,11 @@ function DashboardContent() {
     if (isFirstMessageInSession) {
       try {
         // Create a descriptive session name based on the user's first message
+        // If no input, use "New Conversation"
         const sessionName = inputValue.length > 30 
           ? `${inputValue.substring(0, 30)}...` 
-          : inputValue;
-        
+          : inputValue ? inputValue : "New Conversation";
+
         // Update the session name
         // Add type assertion as sessionId is guaranteed to be a string at this point
         await sessionApi.updateSession(sessionId as string, { name: sessionName });
