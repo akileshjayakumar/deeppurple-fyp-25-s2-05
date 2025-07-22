@@ -282,6 +282,22 @@ export default function SessionDetailPage() {
     }
   };
 
+  const handleDownload = async(fileId: string, filename:string) => {
+    try {
+      const { download_url,expires_in } = await fileApi.downloadFile(fileId);
+      const link = document.createElement("a");
+      link.href = download_url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success(`File ${filename} downloaded successfully!`);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      toast.error("Failed to download file. Please try again.");
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -510,7 +526,7 @@ export default function SessionDetailPage() {
             </Card>
           </div>
         </TabsContent>
-
+{/* Files tab */}
         <TabsContent value="files" className="mt-0">
           <Card className="border shadow-sm">
             <CardHeader className="bg-white border-b">
@@ -543,7 +559,11 @@ export default function SessionDetailPage() {
                           </p>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick = {() => handleDownload(file.id,file.filename)}
+                      >
                         Download
                       </Button>
                     </div>

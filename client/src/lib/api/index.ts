@@ -468,6 +468,17 @@ export const fileApi = {
     const response = await api.delete(`/files/${fileId}`);
     return response.data;
   },
+
+  downloadFile: async (fileId : string) => {
+    const response = await api.get(`/files/${fileId}/download-url`, {
+      responseType: "blob",
+    });
+
+    if (response.status !== 200) {
+      throw new Error("Failed to download file");
+    }
+    return response.data;
+  }
 };
 
 // User Profile APIs
