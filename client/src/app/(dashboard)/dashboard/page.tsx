@@ -100,11 +100,11 @@ function DashboardContent() {
   useEffect(() => {
     const sessionId = searchParams.get('session');
     console.log('Session ID from URL:', sessionId);
-    
+
     // Clear visualization cache when session changes
     setVisualizationData(null);
     setVisualizationCacheKey(null);
-    
+
     if (sessionId) {
       // If a specific session ID is provided in the URL, load that session
       loadExistingSession(sessionId);
@@ -116,18 +116,18 @@ function DashboardContent() {
           // Get all sessions
           const response = await sessionApi.getSessions();
           const sessions = response.sessions || [];
-          
+
           if (sessions.length > 0) {
             // Sort sessions by created_at date in descending order
-            const sortedSessions = [...sessions].sort((a, b) => 
+            const sortedSessions = [...sessions].sort((a, b) =>
               new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             );
-            
+
             // Load the most recent session
             const mostRecentSession = sortedSessions[0];
             console.log('Loading most recent session:', mostRecentSession.id);
             loadExistingSession(mostRecentSession.id);
-            
+
             // Update URL to include session ID without full page refresh
             window.history.pushState({}, '', `/dashboard?session=${mostRecentSession.id}`);
           } else {
@@ -136,10 +136,10 @@ function DashboardContent() {
             setIsCreatingSession(true);
             const session = await sessionApi.createSession("New Conversation");
             setCurrentSessionId(session.id);
-            
+
             // Update URL to include session ID without full page refresh
             window.history.pushState({}, '', `/dashboard?session=${session.id}`);
-            
+
             setMessages([
               {
                 id: "welcome-message",
@@ -158,32 +158,32 @@ function DashboardContent() {
           setIsLoading(false);
         }
       };
-      
+
       findMostRecentSession();
     }
   }, [searchParams]);
-  
+
   // Function to load an existing session
   const loadExistingSession = useCallback(async (sessionId: string) => {
     try {
       setIsLoading(true);
       console.log('Loading session:', sessionId);
-      
+
       // Clear visualization cache when loading a different session
       setVisualizationData(null);
       setVisualizationCacheKey(null);
-      
+
       // Fetch session details
       const session = await sessionApi.getSessionById(sessionId);
       console.log('Session details loaded:', session);
       setCurrentSessionId(sessionId);
-      
+
       // Fetch session messages
       try {
         console.log('Fetching messages for session:', sessionId);
         const messageHistory = await sessionApi.getSessionMessages(sessionId);
         console.log('Message history loaded:', messageHistory);
-        
+
         // Always include the welcome message
         const formattedMessages: Message[] = [
           {
@@ -195,7 +195,7 @@ function DashboardContent() {
         ];
 
         console.log('Formatting messages from history:', messageHistory);
-        
+
         // Add message history if available
         if (messageHistory && messageHistory.length > 0) {
           // Add all messages from history - each message contains both question and answer
@@ -209,7 +209,7 @@ function DashboardContent() {
                 timestamp: new Date(msg.created_at),
               });
             }
-            
+
             // Then add the AI response if it exists
             if (msg.answer_text) {
               formattedMessages.push({
@@ -223,14 +223,14 @@ function DashboardContent() {
             }
           });
         }
-        
+
         console.log('Formatted messages:', formattedMessages);
         setMessages(formattedMessages);
       } catch (error) {
         console.error("Error loading messages:", error);
         toast.error("Failed to load conversation history");
       }
-      
+
       toast.success(`Loaded session: ${session.name}`);
     } catch (error) {
       console.error("Error loading session:", error);
@@ -256,7 +256,7 @@ function DashboardContent() {
     let sessionId = currentSessionId;
     let isFirstMessageInSession = false;
     let currentSessionData = null;
-    
+
     if (!sessionId) {
       try {
         setIsCreatingSession(true);
@@ -265,10 +265,10 @@ function DashboardContent() {
         sessionId = session.id;
         setCurrentSessionId(sessionId);
         isFirstMessageInSession = true;
-        
+
         // Update URL to include session ID without full page refresh
         window.history.pushState({}, '', `/dashboard?session=${sessionId}`);
-        
+
         toast.success("Session created automatically");
       } catch (error) {
         console.error("Error creating session:", error);
@@ -288,15 +288,16 @@ function DashboardContent() {
         console.error("Error checking session:", error);
       }
     }
-    
+
     // If this is the first message, update the session name
     if (isFirstMessageInSession) {
       try {
         // Create a descriptive session name based on the user's first message
-        const sessionName = inputValue.length > 30 
-          ? `${inputValue.substring(0, 30)}...` 
-          : inputValue;
-        
+        // If no input, use "New Conversation"
+        const sessionName = inputValue.length > 30
+          ? `${inputValue.substring(0, 30)}...`
+          : inputValue ? inputValue : "New Conversation";
+
         // Update the session name
         // Add type assertion as sessionId is guaranteed to be a string at this point
         await sessionApi.updateSession(sessionId as string, { name: sessionName });
@@ -325,7 +326,7 @@ function DashboardContent() {
     const currentInput = inputValue;
     const currentFile = selectedFile;
     setSelectedFile(null);
-    
+
     // Create a placeholder message for streaming response
     const aiMessageId = `ai-${Date.now()}`;
     const placeholderMessage: Message = {
@@ -334,38 +335,38 @@ function DashboardContent() {
       role: "assistant",
       timestamp: new Date(),
     };
-    
+
     // Add the placeholder message
     setMessages((prev) => [...prev, placeholderMessage]);
-    
+
     try {
       // Handle file upload first if there's a file
       if (currentFile) {
         try {
           // Upload the file and stream the response
           toast.info("Uploading and analyzing file...");
-          
+
           // Define handlers for streaming and upload progress
           let accumulatedResponse = "";
-          
+
           const handleToken = (token: string) => {
             accumulatedResponse += token;
-            
+
             // Update the message with the accumulated response
-            setMessages((prev) => 
-              prev.map(msg => 
-                msg.id === aiMessageId 
+            setMessages((prev) =>
+              prev.map(msg =>
+                msg.id === aiMessageId
                   ? { ...msg, content: accumulatedResponse}
                   : msg
               )
             );
           };
-          
+
           const handleUploadProgress = (progress: number) => {
             // You could use this to show a progress indicator
             console.log(`Upload progress: ${progress}%`);
           };
-          
+
           // Use the streaming version for file uploads
           await analysisApi.streamQuestionWithFile(
             sessionId as string,
@@ -378,14 +379,14 @@ function DashboardContent() {
           // After the file is uploaded and processed, we clear the last visualization as well as cachekey
           setVisualizationData(null);
           setVisualizationCacheKey(null);
-          
+
 
           // After successful upload and analysis, show the visualize button
           // First remove visualize button from all other messages, then add to current message
           // Avoid the situation where multiple messages have the visualize button -> Only the last file should be visualized
           setMessages((prev) =>
-            prev.map(msg => 
-              msg.id === aiMessageId 
+            prev.map(msg =>
+              msg.id === aiMessageId
                 ? { ...msg, showVisualizeButton: true } // Show visualize button after processing
                 : { ...msg, showVisualizeButton: undefined } // Remove button from all other messages
             )
@@ -395,16 +396,16 @@ function DashboardContent() {
         } catch (uploadError) {
           console.error("Error uploading and analyzing file:", uploadError);
           toast.error("Failed to process file");
-          
+
           // Update placeholder with error message
-          setMessages((prev) => 
-            prev.map(msg => 
-              msg.id === aiMessageId 
-                ? { ...msg, content: "Sorry, I couldn't process that file. Please try again." } 
+          setMessages((prev) =>
+            prev.map(msg =>
+              msg.id === aiMessageId
+                ? { ...msg, content: "Sorry, I couldn't process that file. Please try again." }
                 : msg
             )
           );
-          
+
           setIsLoading(false);
           return;
         }
@@ -412,20 +413,20 @@ function DashboardContent() {
         // For regular questions, use streaming API
         // Define a callback function to handle incoming tokens
         let accumulatedResponse = "";
-        
+
         const handleToken = (token: string) => {
           accumulatedResponse += token;
-          
+
           // Update the message with the accumulated response
-          setMessages((prev) => 
-            prev.map(msg => 
-              msg.id === aiMessageId 
-                ? { ...msg, content: accumulatedResponse } 
+          setMessages((prev) =>
+            prev.map(msg =>
+              msg.id === aiMessageId
+                ? { ...msg, content: accumulatedResponse }
                 : msg
             )
           );
         };
-        
+
         // Use the streaming API
         await analysisApi.streamQuestion(
           sessionId as string,
@@ -467,7 +468,7 @@ function DashboardContent() {
         index === realIdx
           ? { ...msg, showVisualizeButton: "hiding" } // Set to "hiding" state for animation
           : msg
-      );  
+      );
     });
 
     // After animation duration, actually hide the button and show chart type buttons
@@ -482,7 +483,7 @@ function DashboardContent() {
           index === realIdx
             ? { ...msg, showVisualizeButton: false, showChartTypeButtons: true }
             : msg
-        );  
+        );
       });
     }, 150);
   }
@@ -493,23 +494,23 @@ function DashboardContent() {
       toast.error("Please wait for the visualization data to finish loading");
       return;
     }
-    
+
     try {
       toast.info("Loading visualization data...");
       isFetchingVisDataRef.current = true; // Set flag to indicate fetching visualization data is in progress
-      
+
       // First hide the visualize button with animation
       hideVisualizeButton();
-      
+
       // Fetch the visualization data when the button is clicked
       await fetchVisualizationData(sessionId);
-      
+
       toast.success("Visualization data loaded successfully!");
-      
+
     } catch (error) {
       console.error("Error fetching visualization data:", error);
       toast.error("Failed to load visualization data");
-      
+
       // If there's an error, we should show the visualize button again
       setMessages((prev) => {
         const idx = [...prev].reverse().findIndex(
@@ -521,7 +522,7 @@ function DashboardContent() {
           index === realIdx
             ? { ...msg, showVisualizeButton: true, showChartTypeButtons: false }
             : msg
-        );  
+        );
       });
     } finally {
       isFetchingVisDataRef.current = false; // Reset flag when done
@@ -678,7 +679,7 @@ function DashboardContent() {
   //* Component Render
   // Console log for debugging during build
   console.log('Rendering dashboard content, sessionId:', currentSessionId);
-  
+
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
       {/* Chat Header */}
@@ -721,7 +722,7 @@ function DashboardContent() {
               )}
               <div
                 className={`mx-2 rounded-lg p-4 ${
-                  message.chartData 
+                  message.chartData
                     ? "max-w-[95%] min-w-[600px]" // Much wider for charts with minimum width
                     : "max-w-[80%]" // Normal width for text
                 } ${
@@ -778,8 +779,8 @@ function DashboardContent() {
                         <Button
                           variant="outline"
                           className={`rounded-full border-0 transition-all duration-300 ${
-                            visualizationData 
-                              ? "bg-blue-100 text-blue-700 hover:bg-blue-200" 
+                            visualizationData
+                              ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
                               : "bg-gray-100 text-gray-400 cursor-not-allowed"
                           }`}
                           size="sm"
@@ -793,8 +794,8 @@ function DashboardContent() {
                         <Button
                           variant="outline"
                           className={`rounded-full border-0 transition-all duration-300 ${
-                            visualizationData 
-                              ? "bg-green-100 text-green-700 hover:bg-green-200" 
+                            visualizationData
+                              ? "bg-green-100 text-green-700 hover:bg-green-200"
                               : "bg-gray-100 text-gray-400 cursor-not-allowed"
                           }`}
                           size="sm"
