@@ -34,7 +34,7 @@ const signupSchema = z
     confirmPassword: z
       .string()
       .min(8, { message: "Confirm password must be at least 8 characters" }),
-    role: z.enum(["admin", "user"], {
+    role: z.enum(["user"], {
       required_error: "You need to select a role",
     }),
     tier: z
@@ -83,15 +83,12 @@ export default function SignupPage() {
 
   async function onSubmit(data: SignupFormValues) {
     try {
-      const isAdmin = data.role === "admin";
-      const userTier = isAdmin ? "basic" : data.tier;
-
       await signup(
         data.email,
         data.fullName,
         data.password,
-        isAdmin,
-        userTier as string
+        false, // isAdmin is always false now
+        data.tier as string
       );
       toast.success("Account created successfully! Please login.", {
         duration: 3000,
@@ -235,19 +232,7 @@ export default function SignupPage() {
                         defaultValue={field.value}
                         className="flex flex-col space-y-2"
                       >
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="admin" />
-                          </FormControl>
-                          <div className="space-y-1">
-                            <FormLabel className="font-medium text-gray-800">
-                              Administrator
-                            </FormLabel>
-                            <FormDescription className="text-xs text-gray-500">
-                              Admin user with full access to the platform
-                            </FormDescription>
-                          </div>
-                        </FormItem>
+                        
                         <FormItem className="flex items-center space-x-3 space-y-0">
                           <FormControl>
                             <RadioGroupItem value="user" />
