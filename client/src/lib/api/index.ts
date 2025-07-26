@@ -143,7 +143,7 @@ export const sessionApi = {
     const response = await api.delete(`/sessions/${sessionId}`);
     return response.data;
   },
-  
+
   //TODO: update interfaces + frontend in the session details page (INSIGHTS TAB)
   getSessionInsights: async (sessionId: string) => {
     const response = await api.get(`/sessions/${sessionId}/insights`);
@@ -212,7 +212,7 @@ export const analysisApi = {
   },
 
   askVisualizeQuestion: async (
-    sessionId: string, 
+    sessionId: string,
     question:string,
     answer_text:string,
     chart_data: string,
@@ -375,7 +375,7 @@ export const analysisApi = {
       return false;
     }
   },
-  
+
   // Stream version for file uploads with token-by-token responses
   streamQuestionWithFile: async (
     sessionId: string,
@@ -390,16 +390,16 @@ export const analysisApi = {
         question,
         fileName: file.name,
       });
-      
+
       // First, upload the file and get initial processing done
       onTokenCallback("Processing your file... ");
-      
+
       // Create FormData for file upload
       const formData = new FormData();
       formData.append("file", file);
       formData.append("session_id", sessionId);
       formData.append("question", question);
-      
+
       // Upload the file first (this part can't be streamed)
       const uploadResponse = await api.post(
         "/analysis/question/with-file",
@@ -416,11 +416,11 @@ export const analysisApi = {
           },
         }
       );
-      
+
       // Once file is uploaded, stream the response
       onTokenCallback("\n\n");
       onTokenCallback(uploadResponse.data.answer);
-      
+
       return true;
     } catch (error) {
       console.error("Error in streamQuestionWithFile API call:", error);
@@ -470,14 +470,11 @@ export const fileApi = {
   },
 
   downloadFile: async (fileId : string) => {
-    const response = await api.get(`/files/${fileId}/download-url`, {
-      responseType: "blob",
-    });
-
+    const response = await api.get(`/files/${fileId}/download`, {responseType: 'blob'});
     if (response.status !== 200) {
       throw new Error("Failed to download file");
     }
-    return response.data;
+    return response;
   }
 };
 
