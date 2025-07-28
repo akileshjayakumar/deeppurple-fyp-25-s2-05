@@ -1,41 +1,59 @@
-import { useCallback, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useRef } from "react";
 import { sessionApi } from "@/lib/api";
 import { toast } from "sonner";
 import { useDashboard } from "@/hooks/useDashboard";
 import { Message } from "@/lib/contexts/DashboardContext";
-import { clear } from "console";
 
 export function useSession() {
-    const router = useRouter()
-    const searchParams = useSearchParams();
     const {
         currentSessionId,
         setCurrentSessionId,
-        setIsCreatingSession,
         setIsLoading,
         setMessages,
         clearVisualizationCache,
     } = useDashboard();
 
+    const isLoadingSessionRef = useRef<boolean>(false);
     const loadExistingSession = useCallback(async (sessionId: string) => {
+        if (isLoadingSessionRef.current) {
+            console.warn("Session is already loading, ignoring request for session:", sessionId);
+            return;
+        }
+
+        const loadingToast = toast.loading("Loading session...")
+
+
         //* Try fetching session data
         try {
             setIsLoading(true);
+            isLoadingSessionRef.current = true;
             clearVisualizationCache();
             console.log("Loading existing session:", sessionId);
 
             const session = await sessionApi.getSessionById(sessionId);
             if (!session) {
+                toast.dismiss(loadingToast)
                 toast.error("Session not found");
+                if (currentSessionId){
+                    console.warn("Session not found, redirecting to current session:", currentSessionId);
+                    window.history.pushState({}, "", `/dashboard?session=${currentSessionId}`);
+                }
+                else {
+                window.history.pushState({}, "", "/dashboard");
+                }
                 return;
             }
 
             // Update URL and current session ID
-            window.history.pushState({}, "", `/dashboard?sessionId=${session.id}`);
+            if (window.location.search !== `?session=${session.id}`) {
+            window.history.pushState({}, "", `/dashboard?session=${session.id}`);
+            };
+
+            // Update context and localStorage
             setCurrentSessionId(session.id);
 
             //* Try fetching session messages
+            toast.loading("Loading messages...", { id : loadingToast});
             try {
                 const messages = await sessionApi.getSessionMessages(session.id);
                 // welcome message should always be first message even in history
@@ -79,79 +97,32 @@ export function useSession() {
             // Error handling for message fetching
             } catch (err) {
                 console.error("Error loading session messages:", err);
+                toast.dismiss(loadingToast);
                 toast.error("Failed to load session messages");
             }
-
+        toast.dismiss(loadingToast);
+        toast.success("Session loaded successfully");
         // Error handling for session loading
         } catch (error) {
             console.error("Error loading session:", error);
+            toast.dismiss(loadingToast)
             toast.error("Failed to load session");
+            if (currentSessionId) {
+                console.warn("Session not found, redirecting to current session:", currentSessionId);
+                window.history.pushState({}, "", `/dashboard?session=${currentSessionId}`);
+            } else {
+                console.warn("No current session ID, redirecting to dashboard");
+                window.history.pushState({}, "", "/dashboard");
+            }
         } finally {
             setIsLoading(false);
+            isLoadingSessionRef.current = false;
         }
     }, [setCurrentSessionId, setMessages, clearVisualizationCache, setIsLoading]);
-
-
-    const createNewSession = useCallback(async(name: string = "New Conversation") => {
-        try {
-            setIsCreatingSession(true);
-            const newSession = await sessionApi.createSession(name);
-
-            // update url & current session ID
-            window.history.pushState({}, "", `/dashboard?sessionId=${newSession.id}`);
-            setCurrentSessionId(newSession.id);
-        }
-        catch (error) {
-            console.error("Error creating new session:", error);
-            toast.error("Failed to create new session");
-        }
-        finally {
-            setIsCreatingSession(false);
-        }
-    }, [setCurrentSessionId, setIsCreatingSession]);
-
-    const findMostRecentSession = useCallback(async () => {
-        try {
-            setIsLoading(true);
-            const response = await sessionApi.getSessions();
-            const sessionList = [...response.sessions].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-            // User has no sessions , create new one
-            if (sessionList.length === 0 ) {
-                await createNewSession();
-                return;
-            }
-            // User has sessions load the most receont
-            if (sessionList.length > 0) {
-                const mostRecentSession = sessionList[0];
-                setCurrentSessionId(mostRecentSession.id);
-                await loadExistingSession(mostRecentSession.id);
-            }
-        }
-        catch (error) {}
-        finally {
-            setIsLoading(false);
-        }
-
-    }, [setIsLoading, loadExistingSession, createNewSession])
-
-    // Load session from URL parameter or find the most recent session
-    useEffect(() => {
-        const sessionId = searchParams.get("sessionId");
-        clearVisualizationCache();
-        //
-        if (sessionId) {
-            loadExistingSession(sessionId);
-        } else {
-            findMostRecentSession();
-        }
-    },[searchParams, loadExistingSession, findMostRecentSession, clearVisualizationCache]);
 
     // Return the functions to be used in components
     return {
         currentSessionId,
         loadExistingSession,
-        createNewSession,
-        findMostRecentSession
     };
 }

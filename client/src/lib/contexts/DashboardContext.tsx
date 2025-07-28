@@ -15,7 +15,7 @@ export interface Message {
 export interface DashboardState {
     // Session State
     currentSessionId: string | null;
-    isCreatingSession: boolean;
+    isSessionInitialized: boolean;
 
     // Message State
     messages: Message[];
@@ -30,21 +30,20 @@ export interface DashboardState {
     selectedFile: File | null;
 
     // refs
-    fileInputRef: React.RefObject<HTMLInputElement | null>;
-    messagesEndRef: React.RefObject<HTMLDivElement | null>;
-    isVisualizaingRef: React.RefObject<boolean>;
+    isVisualizingRef: React.RefObject<boolean>;
     isFetchingVisDataRef: React.RefObject<boolean>;
 }
 
 export interface DashboardActions {
   // Session Actions
   setCurrentSessionId: (sessionId: string | null ) => void;
-  setIsCreatingSession: (isCreating: boolean) => void;
+  setIsSessionInitialized: (isSessionInitialized: boolean) => void;
 
   // Message Actions
   setMessages: (messages: Message[] | ((prevMessages: Message[]) => Message[])) => void;
   addMessage: (message: Message) => void;
-  removeMessage: (messageId: string, updates: Partial<Message>) => void;
+  removeMessage: (messageId: string) => void;
+  updateMessage: (messageId: string, updates: Partial<Message>) => void;
 
   // Visualization actions
   setVisualizationData: (data: QuestionDataVisualization | null) => void;

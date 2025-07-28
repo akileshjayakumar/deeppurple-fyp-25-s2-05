@@ -392,7 +392,7 @@ export const analysisApi = {
       });
 
       // First, upload the file and get initial processing done
-      onTokenCallback("Processing your file... ");
+      onTokenCallback("PROCESSING_START");
 
       // Create FormData for file upload
       const formData = new FormData();
@@ -417,9 +417,16 @@ export const analysisApi = {
         }
       );
 
-      // Once file is uploaded, stream the response
-      onTokenCallback("\n\n");
-      onTokenCallback(uploadResponse.data.answer);
+      // Once file is uploaded, show response
+      onTokenCallback("PROCESSING_END");
+      const response = uploadResponse.data.answer;
+      const words = response.split(' ');
+
+      // simulate the sreaming of tokens
+      for (let i = 0; i < words.length; i++) {
+            await new Promise(resolve => setTimeout(resolve, 2));
+            onTokenCallback(words[i] + (i < words.length - 1 ? ' ' : ''));
+        }
 
       return true;
     } catch (error) {
