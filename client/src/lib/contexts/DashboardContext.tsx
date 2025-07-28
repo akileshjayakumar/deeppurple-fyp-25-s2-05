@@ -16,6 +16,7 @@ export interface DashboardState {
     // Session State
     currentSessionId: string | null;
     isSessionInitialized: boolean;
+    isNewSession: boolean;
 
     // Message State
     messages: Message[];
@@ -38,6 +39,7 @@ export interface DashboardActions {
   // Session Actions
   setCurrentSessionId: (sessionId: string | null ) => void;
   setIsSessionInitialized: (isSessionInitialized: boolean) => void;
+  setIsNewSession: (isNewSession: boolean) => void;
 
   // Message Actions
   setMessages: (messages: Message[] | ((prevMessages: Message[]) => Message[])) => void;

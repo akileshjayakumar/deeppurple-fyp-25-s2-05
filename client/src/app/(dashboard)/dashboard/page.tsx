@@ -15,7 +15,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ExportOptions } from "@/components/session/ExportOptions";
 
-
 // types
 import { QuestionDataVisualization } from "@/types";
 import { EmotionDistributionChart } from "@/components/session/EmotionDistributionChart";
@@ -27,10 +26,6 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { useSession } from "@/hooks/useSession";
 import { useMessage } from "@/hooks/useMessage";
 import { useVisualization } from "@/hooks/useVisualization";
-
-
-
-
 
 // This is the main dashboard component that will be wrapped with Suspense
 function DashboardContent() {
@@ -52,6 +47,7 @@ function DashboardContent() {
     clearVisualizationCache,
     visualizationData,
     isFetchingVisDataRef,
+    isNewSession,
   } = useDashboard();
 
   // Message Hook
@@ -84,6 +80,10 @@ function DashboardContent() {
   useEffect(() => {
     if (!currentSessionId) {
         console.log("No current session available yet");
+        return;
+    }
+    if (isNewSession) {
+        console.log("Newly created session, skip load")
         return;
     }
     if (sessionId && sessionId !== currentSessionId){

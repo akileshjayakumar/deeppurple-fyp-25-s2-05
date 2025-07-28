@@ -1,5 +1,6 @@
 "use client";
 import React, {  useState, useEffect, useRef, ReactNode, useCallback } from "react";
+import { Loader2 } from "lucide-react";
 import { DashboardContext, DashboardContextType, Message } from '@/lib/contexts/DashboardContext';
 import { QuestionDataVisualization } from "@/types";
 import { sessionApi } from "@/lib/api";
@@ -12,6 +13,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   // Session state + initialization -- Component will always operate with a defined sessionId
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [isSessionInitialized, setIsSessionInitialized] = useState<boolean>(false);
+  const [isNewSession, setIsNewSession] = useState<boolean>(false);
 
   // Initialize the session
   useEffect(() => {
@@ -34,11 +36,14 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
                 return currentTime > latestTime ? current : latest;
             }
             ).id;
+            setIsNewSession(false)
             console.log("Using most recent session:", sessionId);
         } else {
             // Create new session
+            // Does not update url.
             console.log(" Creating new session...");
             const session = await sessionApi.createSession("New Conversation");
+            setIsNewSession(true);
             sessionId = session.id;
         }
         setCurrentSessionId(sessionId);
@@ -113,11 +118,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   // Early returns
   // Session is initializing
-  if (!isSessionInitialized){
+    if (!isSessionInitialized){
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <Loader2 className="h-8 w-8 animate-spin text-purple-600 mx-auto mb-2" />
           <p className="text-gray-600">Initializing session...</p>
         </div>
       </div>
@@ -142,6 +147,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setCurrentSessionId,
     isSessionInitialized,
     setIsSessionInitialized,
+    isNewSession,
+    setIsNewSession,
 
     // Message State
     messages,
