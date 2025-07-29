@@ -39,6 +39,7 @@ export function useMessage() {
             return;
         }
         setIsLoading(true);
+        const loadingToast = toast.loading("Sending message..")
 
         // Check if message is first in session
         try {
@@ -55,9 +56,15 @@ export function useMessage() {
         }
 
         // Add user message
+        let content_msg: string | null = null
+        if (selectedFile && inputValue.trim()){
+            content_msg = `[File: ${selectedFile.name}] ${inputValue.trim()}`
+        } else {
+            content_msg =selectedFile ? `[File: ${selectedFile.name}]` : (inputValue.trim()) ? inputValue.trim() : ""
+        }
         const userMessage: Message = {
             id: `user-${Date.now()}`,
-            content: selectedFile ? `[File: ${selectedFile.name}]` : (" " + inputValue.trim()) ? inputValue.trim() : "",
+            content: content_msg,
             role: "user",
             timestamp: new Date(),
         };
@@ -106,7 +113,7 @@ export function useMessage() {
             };
             // File upload answer
             if (currentFile){
-                toast.info("Uploading and analyzing file...")
+                toast.loading("Uploading and analyzing file...", {id : loadingToast})
                 // Streaming version for file uploads
                 await analysisApi.streamQuestionWithFile(
                     currentSessionId as string,
@@ -126,9 +133,9 @@ export function useMessage() {
                         : { ...msg, showVisualizeButton: undefined }
                     )
                 );
-                toast.success("File uploaded and analyzed successfully.");
                 } else {
                 // Handle question without file upload
+                toast.loading("Analyzing text...", {id : loadingToast})
                 await analysisApi.streamQuestion(currentSessionId as string, currentInput, handleToken);
                 }
             } catch (AnswerError) {
@@ -137,6 +144,7 @@ export function useMessage() {
                 updateMessage(aiMessageId, { content: "Failed to answer query." });
             } finally {
                 setIsLoading(false);
+                toast.dismiss(loadingToast)
             }
 
             // If session was created, we reset to welcome message

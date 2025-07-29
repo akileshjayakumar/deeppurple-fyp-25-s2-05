@@ -58,8 +58,8 @@ export function useVisualization() {
             return;
         }
 
+        const loadingToast = toast.loading("Loading visualization data...")
         try {
-            toast.info("Loading visualization data...");
             isFetchingVisDataRef.current = true;
 
             // hide the visualization button
@@ -83,10 +83,12 @@ export function useVisualization() {
             if (!response || !response.overview || !response.overview.emotion_distribution) {
                 throw new Error("Invalid visualization data received");
             }
+            toast.dismiss(loadingToast)
             toast.success("Visualization data loaded successfully!");
 
 
         } catch (error) {
+            toast.dismiss(loadingToast)
             console.error("Error in handleVisualizeClick:", error);
             toast.error("Failed to load visualization data");
              // If theres no visualization show the button again
@@ -189,8 +191,6 @@ export function useVisualization() {
                 JSON.stringify(chartData),
                 chartType
             );
-
-            toast.success(`Successfully visualized ${formattedChartType} chart!`);
         } catch (error) {
             console.error("Error handling chart type click:", error);
             toast.error("Failed to visualize chart data");

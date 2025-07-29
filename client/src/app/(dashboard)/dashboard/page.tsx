@@ -77,12 +77,13 @@ function DashboardContent() {
 
  // Only handle explicit session changes from URL
   const sessionId = searchParams.get("session")
+  const isNewFromUrl = searchParams.get("new") === "true";
   useEffect(() => {
     if (!currentSessionId) {
         console.log("No current session available yet");
         return;
     }
-    if (isNewSession) {
+    if (isNewSession || isNewFromUrl) {
         console.log("Newly created session, skip load")
         return;
     }

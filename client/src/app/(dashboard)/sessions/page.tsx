@@ -48,6 +48,7 @@ import { Label } from "@/components/ui/label";
 
 import { sessionApi } from "@/lib/api";
 import { SessionWithInsights } from "@/types";
+import { useDashboard } from "@/hooks/useDashboard"
 
 export default function SessionsPage() {
   const router = useRouter();
@@ -58,6 +59,7 @@ export default function SessionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+
   // Emotions filter removed as it was deemed unnecessary
   const [isNewSessionDialogOpen, setIsNewSessionDialogOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState("");
@@ -135,7 +137,7 @@ export default function SessionsPage() {
       setIsNewSessionDialogOpen(false);
 
       // Navigate to the dashboard with the new session ID
-      router.push(`/dashboard?session=${session.id}`);
+      router.push(`/dashboard?session=${session.id}&new=true`);
     } catch (error) {
       console.error("Error creating session:", error);
       toast.error("Failed to create session");
@@ -493,7 +495,7 @@ export default function SessionsPage() {
                     </div>
                   )}
               </CardContent>
-              <CardFooter className="pt-1 bg-gray-50">
+              <CardFooter className="pt-1">
                 <Button
                   variant="outline"
                   className="w-full hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200"
