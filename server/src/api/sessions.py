@@ -9,14 +9,22 @@ import json
 import markdown2
 import pandas as pd
 from datetime import datetime
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
+
+from utils.sessions import markdown_to_reportlab_paragraphs, generate_chart_from_data, create_reportlab_image
+from utils.logger import logger
 
 from schemas import schemas
 from core.auth import get_current_active_user
 from core.database import get_db
 from models.models import User, Session as SessionModel, File, Insight, Question, FileContent
+
+# Reportlab imports
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER,TA_RIGHT
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -529,16 +537,16 @@ async def export_session_to_csv(
             })
 
     df = pd.DataFrame(data)
-    
+
     # Create a string buffer to store the CSV
     buffer = io.StringIO()
     df.to_csv(buffer, index=False)
     buffer.seek(0)
-    
+
     # Generate a filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"session_{session_id}_{timestamp}.csv"
-    
+
     # Return the CSV as a streaming response
     return StreamingResponse(
         iter([buffer.getvalue()]),
@@ -575,11 +583,11 @@ async def export_session_to_markdown(
     messages = db.query(Question).filter(
         Question.session_id == session_id
     ).order_by(Question.created_at.asc()).all()
-    
+
     # Create markdown content
     md_content = f"# Session: {session.name}\n\n"
     md_content += f"*Exported on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n"
-    
+
     for msg in messages:
         # Add user question
         md_content += f"## User ({msg.created_at.strftime('%Y-%m-%d %H:%M:%S')})\n\n"
@@ -590,18 +598,18 @@ async def export_session_to_markdown(
             md_content += f"## Visualization: {msg.chart_type} ({msg.created_at.strftime('%Y-%m-%d %H:%M:%S')})\n\n"
             md_content += f"```json\n{json.dumps(msg.chart_data, indent=2)}\n```\n\n"
             md_content += "---\n\n"
-        
+
         # Add assistant response if available
         elif msg.answer_text:
             timestamp = msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
             md_content += f"## Assistant ({timestamp})\n\n"
             md_content += f"{msg.answer_text}\n\n"
             md_content += "---\n\n"
-    
+
     # Generate a filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"session_{session_id}_{timestamp}.md"
-    
+
     # Return the markdown content as a downloadable file
     return Response(
         content=md_content,
@@ -638,60 +646,88 @@ async def export_session_to_pdf(
     messages = db.query(Question).filter(
         Question.session_id == session_id
     ).order_by(Question.created_at.asc()).all()
-    
+
     # Create a buffer for the PDF
     buffer = io.BytesIO()
-    
+
     # Create the PDF document
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     elements = []
-    
+
+    # Custom style
+    centered_style = ParagraphStyle(
+        name="Centered",
+        parent=styles["Normal"],
+        alignment=TA_CENTER,
+    )
+
+
+    small_grey_right_style = ParagraphStyle(
+        name="SmallGreyRight",
+        parent=styles["Normal"],
+        fontSize=8,
+        textColor=colors.grey,
+        alignment=TA_RIGHT,
+        spaceBefore=2,
+        spaceAfter=8,
+    )
+
     # Add title and timestamp
     title_style = styles["Title"]
     elements.append(Paragraph(f"Session: {session.name}", title_style))
-    elements.append(Paragraph(f"Exported on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]))
-    elements.append(Spacer(1, 12))
-    
+    elements.append(Paragraph(f"Exported on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", centered_style))
+    elements.append(Spacer(1, 6))
+
     # Add conversation content
     for msg in messages:
         # Add user question
-        elements.append(Paragraph(f"<b>User</b> ({msg.created_at.strftime('%Y-%m-%d %H:%M:%S')})", styles["Heading2"]))
-        elements.append(Paragraph(msg.question_text, styles["Normal"]))
-        elements.append(Spacer(1, 12))
-        
-        # TODO: Currently just dumps chart data as JSON in PDF, change to actual chart image later
+        user_question_formatted = msg.question_text.replace('\n','<br/>')
+        elements.append(Paragraph("<b>User</b>", styles["Heading2"]))
+        elements.append(Paragraph(user_question_formatted, styles["Normal"]))
+
+        # Footer
+        elements.append(Paragraph(msg.created_at.strftime('%Y-%m-%d %H:%M:%S'), small_grey_right_style))
+        elements.append(Spacer(1, 6))
+
+
         # Include chart data if available
         if msg.chart_data:
             # Add visualization message
-            elements.append(Paragraph(f"<b>Visualization: {msg.chart_type}</b> ({msg.created_at.strftime('%Y-%m-%d %H:%M:%S')})", styles["Heading2"]))
-            elements.append(Paragraph(json.dumps(msg.chart_data, indent=2), styles["Normal"]))
-            elements.append(Spacer(1, 12))
-            elements.append(Paragraph("<hr/>", styles["Normal"]))
-            elements.append(Spacer(1, 12))
-        
+            elements.append(Paragraph(f"<b>Visualization: {msg.chart_type.replace('_', ' ')}</b>", styles["Heading2"]))
+
+            # Chart
+            elements.append(Spacer(1,3))
+            image_bytes = generate_chart_from_data(msg.chart_data, msg.chart_type)
+            elements.append(create_reportlab_image(image_bytes=image_bytes))
+            elements.append(Spacer(1,3))
+
+            # Footer
+            elements.append(Paragraph(msg.created_at.strftime('%Y-%m-%d %H:%M:%S'), small_grey_right_style))
+            elements.append(Spacer(1, 6))
+
         # Add assistant response if available
         elif msg.answer_text:
             timestamp = msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
-            elements.append(Paragraph(f"<b>Assistant</b> ({timestamp})", styles["Heading2"]))
-            elements.append(Paragraph(msg.answer_text, styles["Normal"]))
-            elements.append(Spacer(1, 12))
-            
-            # Add a divider
-            elements.append(Paragraph("<hr/>", styles["Normal"]))
-            elements.append(Spacer(1, 12))
-    
+            elements.append(Paragraph(f"<b>Assistant</b>", styles["Heading2"]))
+            formatted_elements = markdown_to_reportlab_paragraphs(msg.answer_text, styles)
+            elements.extend(formatted_elements)
+
+            # Footer
+            elements.append(Paragraph(timestamp,small_grey_right_style))
+            elements.append(Spacer(1, 6))
+
     # Build the PDF
     doc.build(elements)
-    
+
     # Get the PDF content from the buffer
     buffer.seek(0)
     pdf_content = buffer.getvalue()
-    
+
     # Generate a filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"session_{session_id}_{timestamp}.pdf"
-    
+
     # Return the PDF as a streaming response
     return Response(
         content=pdf_content,

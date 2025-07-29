@@ -60,20 +60,20 @@ export default function DashboardLayout({
   const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
   const { user, logout } = useAuth();
   const [isCreatingSession, setIsCreatingSession] = React.useState(false);
-  
+
   // Add a state to force re-render when user data changes
   const [forceUpdate, setForceUpdate] = React.useState(0);
-  
+
   // Listen for user-updated events
   React.useEffect(() => {
     const handleUserUpdated = () => {
       // Force re-render of the component
       setForceUpdate(prev => prev + 1);
     };
-    
+
     // Add event listener for custom user-updated event
     window.addEventListener('user-updated', handleUserUpdated);
-    
+
     // Cleanup event listener on unmount
     return () => {
       window.removeEventListener('user-updated', handleUserUpdated);
@@ -86,12 +86,12 @@ export default function DashboardLayout({
       // Create a fresh session with a default name
       // The name will be updated based on the first message when sent
       const session = await sessionApi.createSession("New Conversation");
-      
+
       toast.success("New session created");
-      
+
       // Navigate to the dashboard with the new session ID
       // This preserves the previous session in the database
-      router.push(`/dashboard?session=${session.id}`);
+      router.push(`/dashboard?session=${session.id}&new=true`);
     } catch (error) {
       console.error("Error creating new session:", error);
       toast.error("Failed to create new session");
@@ -184,9 +184,9 @@ export default function DashboardLayout({
               </div>
 
               <div className="p-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start mb-4" 
+                <Button
+                  variant="outline"
+                  className="w-full justify-start mb-4"
                   onClick={handleCreateSession}
                   disabled={isCreatingSession}
                 >
@@ -236,9 +236,9 @@ export default function DashboardLayout({
           </div>
 
           <div className="p-4">
-            <Button 
-              variant="outline" 
-              className="w-full justify-start" 
+            <Button
+              variant="outline"
+              className="w-full justify-start"
               onClick={handleCreateSession}
               disabled={isCreatingSession}
             >
@@ -264,10 +264,10 @@ export default function DashboardLayout({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Avatar>
-                  <AvatarImage 
-                    src={user?.profile_picture ? 
-                      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/users/profile-picture/${user.profile_picture}` : 
-                      ""} 
+                  <AvatarImage
+                    src={user?.profile_picture ?
+                      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/users/profile-picture/${user.profile_picture}` :
+                      ""}
                   />
                   <AvatarFallback className="bg-purple-100 text-purple-700">
                     {getInitials()}
@@ -303,10 +303,10 @@ export default function DashboardLayout({
           <header className="hidden md:flex items-center justify-end p-4 border-b bg-white shadow-sm">
             <div className="flex items-center">
               <Avatar className="cursor-pointer">
-                <AvatarImage 
-                  src={user?.profile_picture ? 
-                    `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/users/profile-picture/${user.profile_picture}` : 
-                    ""} 
+                <AvatarImage
+                  src={user?.profile_picture ?
+                    `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/users/profile-picture/${user.profile_picture}` :
+                    ""}
                 />
                 <AvatarFallback className="bg-purple-100 text-purple-700">
                   {getInitials()}

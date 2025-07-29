@@ -39,6 +39,7 @@ function DashboardContent() {
   const {
     messages,
     currentSessionId,
+    setCurrentSessionId,
     inputValue,
     setInputValue,
     selectedFile,
@@ -48,6 +49,7 @@ function DashboardContent() {
     visualizationData,
     isFetchingVisDataRef,
     isNewSession,
+    resetToWelcomeMessage,
   } = useDashboard();
 
   // Message Hook
@@ -85,6 +87,11 @@ function DashboardContent() {
     }
     if (isNewSession || isNewFromUrl) {
         console.log("Newly created session, skip load")
+        resetToWelcomeMessage();
+        if (sessionId && sessionId !== currentSessionId) {
+            console.log("Updating currentSessionId to new session:", sessionId);
+            setCurrentSessionId(sessionId);
+        }
         return;
     }
     if (sessionId && sessionId !== currentSessionId){
@@ -95,7 +102,7 @@ function DashboardContent() {
         console.log("Updating URL to current session: ", currentSessionId);
         window.history.replaceState({}, "", `/dashboard?session=${currentSessionId}`);
     }
-  }, [sessionId, currentSessionId, loadExistingSession,clearVisualizationCache])
+  }, [sessionId, currentSessionId, loadExistingSession,clearVisualizationCache,resetToWelcomeMessage]);
 
 
   // File Upload and Input Handling
