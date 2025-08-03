@@ -29,13 +29,11 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmotionDistributionChart } from "@/components/session/EmotionDistributionChart";
+import { KeyTopicsBarChart } from "@/components/session/KeyTopicsBarChart";
+import {Message} from "@/lib/contexts/DashboardContext";
 
-interface Message {
-  id: string;
-  content: string;
-  role: "user" | "assistant" | "system";
-  timestamp: Date;
-}
+
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -127,6 +125,8 @@ export default function SessionDetailPage() {
             formattedMessages.push({
               id: `assistant-${msg.id}`,
               content: msg.answer_text,
+              chartData: msg.chart_data,
+              chartType: msg.chart_type,
               role: "assistant",
               timestamp: msg.answered_at
                 ? new Date(msg.answered_at)
@@ -354,7 +354,7 @@ export default function SessionDetailPage() {
           setActiveTab(value as "chat" | "files" | "insights")
         }
       >
-        <TabsList className="grid grid-cols-3 mb-4">
+        <TabsList className="grid grid-cols-2 mb-4">
           <TabsTrigger
             value="chat"
             className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-800"
@@ -367,17 +367,17 @@ export default function SessionDetailPage() {
           >
             Files ({files.length})
           </TabsTrigger>
-          <TabsTrigger
+          {/* <TabsTrigger
             value="insights"
             className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-800"
           >
             Insights
-          </TabsTrigger>
+          </TabsTrigger> */}
         </TabsList>
 
+        {/* chat_tab */}
         <TabsContent value="chat" className="mt-0">
           <div className="grid grid-cols-1 gap-6">
-            {/* Chat area */}
             <Card className="h-[70vh] flex flex-col border shadow-sm">
               <CardHeader className="bg-white border-b">
                 <CardTitle className="flex justify-between items-center">
@@ -403,41 +403,57 @@ export default function SessionDetailPage() {
               {/* Messages area with scroll */}
               <CardContent className="flex-grow overflow-auto border-y p-4">
                 <div className="space-y-4">
-                  {messages.map((message) => (
+                {messages.map((message) => (
+                    // This div wraps each message and aligns it based on the role
                     <div
-                      key={message.id}
-                      className={`flex ${
-                        message.role === "user"
-                          ? "justify-end"
-                          : "justify-start"
-                      }`}
+                    key={message.id}
+                    className={`flex ${
+                        message.role === "user" ? "justify-end" : "justify-start"
+                    }`}
                     >
-                      {message.role !== "user" && (
+                    {/* Renders the AI profile pic */}
+                    {message.role !== "user" && (
                         <Avatar
-                          className={
+                        className={
                             message.role === "assistant"
-                              ? "bg-purple-600"
-                              : "bg-gray-400"
-                          }
+                            ? "bg-purple-600"
+                            : "bg-gray-400"
+                        }
                         >
-                          <AvatarFallback>
+                        <AvatarFallback>
                             {message.role === "assistant" ? "AI" : "SYS"}
-                          </AvatarFallback>
+                        </AvatarFallback>
                         </Avatar>
-                      )}
-
-                      <div
-                        className={`mx-2 rounded-lg p-4 max-w-[80%] ${
-                          message.role === "user"
+                    )}
+                    <div
+                        className={`mx-2 rounded-lg p-4 ${
+                        message.chartData
+                            ? "max-w-[95%] min-w-[600px]" // Much wider for charts with minimum width
+                            : "max-w-[80%]" // Normal width for text
+                        } ${
+                        message.role === "user"
                             ? "bg-purple-600 text-white"
                             : message.role === "assistant"
                             ? "bg-white border"
                             : "bg-gray-100"
                         }`}
-                      >
-                        <div className="whitespace-pre-wrap">
-                          {message.content}
+                    >
+                        {/* Message content */}
+                        <div className="whitespace-pre-wrap">{message.content}</div>
+
+                        {/* Render chart if available */}
+                        {/* Emotion Distribution Radial Chart */}
+                        {message.chartData && (message.chartType === "emotion_distribution") && (
+                        <div className="mt-4">
+                            <EmotionDistributionChart data={message.chartData} />
                         </div>
+                        )}
+                        {/* Key Topics Bar Chart */}
+                        {message.chartData && (message.chartType === "key_topics") && (
+                        <div className="mt-4">
+                            <KeyTopicsBarChart data={message.chartData} />
+                        </div>
+                        )}
                         <div className="text-xs opacity-70 mt-2 text-right">
                           {message.timestamp.toLocaleTimeString([], {
                             hour: "2-digit",
@@ -577,7 +593,7 @@ export default function SessionDetailPage() {
           </Card>
         </TabsContent>
 
- {/* TODO: Insights chart */}
+ {/*
         <TabsContent value="insights" className="mt-0">
           <Card className="border shadow-sm">
             <CardHeader className="bg-white border-b">
@@ -595,7 +611,7 @@ export default function SessionDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Sentiment Summary */}
+                  Sentiment Summary
                   <div>
                     <h3 className="text-lg font-medium mb-2">
                       Sentiment Analysis
@@ -651,7 +667,7 @@ export default function SessionDetailPage() {
                     )}
                   </div>
 
-                  {/* Emotion Summary */}
+                  // Emotion Summary
                   <div>
                     <h3 className="text-lg font-medium mb-2">
                       Emotion Analysis
@@ -701,7 +717,7 @@ export default function SessionDetailPage() {
                     )}
                   </div>
 
-                  {/* Topics */}
+                  // Topics
                   <div>
                     <h3 className="text-lg font-medium mb-2">Topics</h3>
                     {session.insights.topics &&
@@ -727,6 +743,8 @@ export default function SessionDetailPage() {
             </CardContent>
           </Card>
         </TabsContent>
+*/}
+
       </Tabs>
     </div>
   );

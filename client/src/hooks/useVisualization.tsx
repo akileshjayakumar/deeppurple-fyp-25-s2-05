@@ -123,7 +123,7 @@ export function useVisualization() {
             isVisualizingRef.current = true;
             const formattedChartType = chartType.replace(/_/g, " ");
             const userMessageContent = `Show me the ${formattedChartType} chart for the last file uploaded.`;
-            const aiMessageContent = `Here is the ${formattedChartType} chart for the last file uploaded.`;
+            let aiMessageContent = ``;
 
             const userMessage: Message = {
                 id: `user-${Date.now()}`,
@@ -155,12 +155,14 @@ export function useVisualization() {
                 if (!response.overview.emotion_distribution) {
                     throw new Error("Emotion distribution data is not available");
                 }
+                aiMessageContent = `Here is the spider chart of ${formattedChartType}!`
                 chartData = response.overview.emotion_distribution;
             }
             else if (chartType === "key_topics") {
                 if (!response.overview.key_topics) {
                     throw new Error("Key topics data is not available");
                 }
+                aiMessageContent = `Here is the bar chart of ${formattedChartType}!`
                 chartData = response.overview.key_topics;
             }
             else {

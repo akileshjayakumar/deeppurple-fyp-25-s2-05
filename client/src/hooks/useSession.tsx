@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useDashboard } from "@/hooks/useDashboard";
 import { Message } from "@/lib/contexts/DashboardContext";
 
+
 export function useSession() {
     const {
         currentSessionId,

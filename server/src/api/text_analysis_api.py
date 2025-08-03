@@ -648,7 +648,8 @@ async def stream_question_answer(
 
     # Create conversation history in reverse chronological order (oldest first)
     conversation_history = [
-        {"question": q.question_text, "answer": q.answer_text}
+        {"question": q.question_text, "answer": q.answer_text} if not q.chart_data else
+        {"question": q.question_text, "answer": f'{q.answer_text}: {q.chart_data}'}
         for q in reversed(previous_questions)
     ]
 

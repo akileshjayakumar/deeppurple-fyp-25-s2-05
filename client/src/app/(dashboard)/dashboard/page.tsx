@@ -16,11 +16,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ExportOptions } from "@/components/session/ExportOptions";
 
 // types
-import { QuestionDataVisualization } from "@/types";
 import { EmotionDistributionChart } from "@/components/session/EmotionDistributionChart";
 import { KeyTopicsBarChart } from "@/components/session/KeyTopicsBarChart";
 
-import { Message } from "@/lib/contexts/DashboardContext";
 import { DashboardProvider } from "@/lib/providers/DashboardProvider";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useSession } from "@/hooks/useSession";

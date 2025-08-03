@@ -5,8 +5,6 @@ import { Message } from "@/lib/contexts/DashboardContext";
 import { sessionApi, analysisApi } from "@/lib/api";
 
 
-
-
 export function useMessage() {
     const {
         setMessages,
@@ -41,7 +39,7 @@ export function useMessage() {
         setIsLoading(true);
         const loadingToast = toast.loading("Sending message..")
 
-        // Check if message is first in session
+        // Check if message is first in session -> Can be improved to just handle on backend
         try {
             const currentSessionData = await sessionApi.getSessionById(currentSessionId);
             if (currentSessionData?.name === "New Conversation" && inputValue.trim()) {

@@ -502,7 +502,7 @@ export default function SessionsPage() {
                   asChild
                 >
                   <Link href={`/dashboard?session=${session.id}`}>
-                    View Details
+                    View Session
                   </Link>
                 </Button>
               </CardFooter>
