@@ -282,7 +282,7 @@ export default function SessionDetailPage() {
     }
   };
 
-  const handleDownload = async(fileId: string, filename:string) => {
+  const handleDownload = async (fileId: string, filename: string) => {
     try
         {
         const response = await fileApi.downloadFile(fileId);
