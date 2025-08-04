@@ -56,7 +56,7 @@ def generate_chart_from_data(chart_data, chart_type):
             values += values[:1]
             angles += angles[:1]
             fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-            ax.plot(angles, values, color='#d8caf9', linewidth=2, label='Strengh of Emotion')
+            ax.plot(angles, values, color='#d8caf9', linewidth=2, label='Strength of Emotion')
             ax.fill(angles, values, color='#d8caf9', alpha=0.7)
             ax.set_xticks(angles[:-1])
             ax.set_xticklabels(labels)
