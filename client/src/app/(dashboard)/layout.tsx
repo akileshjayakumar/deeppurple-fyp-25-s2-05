@@ -150,12 +150,14 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-white">
       {/* Mobile Header */}
       <header className="md:hidden flex justify-between items-center p-4 border-b bg-white shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="bg-purple-600 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center">
-            DP
+        <Link href="/dashboard" className="no-underline">
+          <div className="flex items-center gap-2">
+            <div className="bg-purple-600 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center">
+              DP
+            </div>
+            <h1 className="text-xl font-bold text-purple-700">DeepPurple</h1>
           </div>
-          <h1 className="text-xl font-bold text-purple-700">DeepPurple</h1>
-        </div>
+        </Link>
 
         <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
           <SheetTrigger asChild>
@@ -166,14 +168,16 @@ export default function DashboardLayout({
           <SheetContent side="left" className="p-0">
             <div className="flex flex-col h-full">
               <div className="p-4 border-b flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <div className="bg-purple-600 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center">
-                    DP
+                <Link href="/dashboard" className="no-underline">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-purple-600 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center">
+                      DP
+                    </div>
+                    <h1 className="text-xl font-bold text-purple-700">
+                      DeepPurple
+                    </h1>
                   </div>
-                  <h1 className="text-xl font-bold text-purple-700">
-                    DeepPurple
-                  </h1>
-                </div>
+                </Link>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -228,12 +232,16 @@ export default function DashboardLayout({
       <div className="flex h-screen md:h-screen">
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex md:w-64 border-r flex-col bg-white">
-          <div className="p-4 border-b flex items-center gap-2">
-            <div className="bg-purple-600 text-white font-bold rounded-full w-10 h-10 flex items-center justify-center">
-              DP
+
+          {/* Logo and Title */}
+          <Link href="/dashboard" className="no-underline hover:opacity-80 transition-opacity">
+            <div className="p-4 border-b flex items-center gap-2">
+              <div className="bg-purple-600 text-white font-bold rounded-full w-10 h-10 flex items-center justify-center">
+                DP
+              </div>
+              <h1 className="text-xl font-bold text-purple-700">DeepPurple</h1>
             </div>
-            <h1 className="text-xl font-bold text-purple-700">DeepPurple</h1>
-          </div>
+          </Link>
 
           <div className="p-4">
             <Button
