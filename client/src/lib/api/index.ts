@@ -143,14 +143,12 @@ export const sessionApi = {
     const response = await api.delete(`/sessions/${sessionId}`);
     return response.data;
   },
-  
+
   //TODO: update interfaces + frontend in the session details page (INSIGHTS TAB)
   getSessionInsights: async (sessionId: string) => {
     const response = await api.get(`/sessions/${sessionId}/insights`);
     return response.data;
   },
-
-
 
   getSessionMessages: async (sessionId: string) => {
     const response = await api.get(`/sessions/${sessionId}/messages`);
@@ -160,21 +158,21 @@ export const sessionApi = {
   // Export session data to different formats
   exportToCSV: async (sessionId: string) => {
     const response = await api.get(`/sessions/${sessionId}/export/csv`, {
-      responseType: 'blob',
+      responseType: "blob",
     });
     return response.data;
   },
 
   exportToMarkdown: async (sessionId: string) => {
     const response = await api.get(`/sessions/${sessionId}/export/md`, {
-      responseType: 'blob',
+      responseType: "blob",
     });
     return response.data;
   },
 
   exportToPDF: async (sessionId: string) => {
     const response = await api.get(`/sessions/${sessionId}/export/pdf`, {
-      responseType: 'blob',
+      responseType: "blob",
     });
     return response.data;
   },
@@ -196,29 +194,21 @@ export const analysisApi = {
     return response.data;
   },
 
-
-  // TODO: Add persistence to this, analysis results are currently not being saved
-
-  //TODO:  Make it so when the users clicks this, a new question row is added where question_text is "Visualize this file" etc..
   visualizeLastFile: async (sessionId: string) => {
     const formData = new FormData();
     formData.append("session_id", sessionId);
-    const response = await api.post(
-      'analysis/visualize/last-file',
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
+    const response = await api.post("analysis/visualize/last-file", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data;
   },
 
   askVisualizeQuestion: async (
-    sessionId: string, 
-    question:string,
-    answer_text:string,
+    sessionId: string,
+    question: string,
+    answer_text: string,
     chart_data: string,
-    chart_type:string
+    chart_type: string
   ) => {
     const formData = new FormData();
     formData.append("session_id", sessionId);
@@ -227,16 +217,11 @@ export const analysisApi = {
     formData.append("chart_data", chart_data);
     formData.append("chart_type", chart_type);
 
-    const response = await api.post(
-      'analysis/question/visualize',
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
+    const response = await api.post("analysis/question/visualize", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data;
   },
-
 
   askQuestion: async (sessionId: string, question: string) => {
     try {
@@ -377,7 +362,7 @@ export const analysisApi = {
       return false;
     }
   },
-  
+
   // Stream version for file uploads with token-by-token responses
   streamQuestionWithFile: async (
     sessionId: string,
@@ -392,16 +377,16 @@ export const analysisApi = {
         question,
         fileName: file.name,
       });
-      
+
       // First, upload the file and get initial processing done
-      onTokenCallback("Processing your file... ");
-      
+      onTokenCallback("PROCESSING_START");
+
       // Create FormData for file upload
       const formData = new FormData();
       formData.append("file", file);
       formData.append("session_id", sessionId);
       formData.append("question", question);
-      
+
       // Upload the file first (this part can't be streamed)
       const uploadResponse = await api.post(
         "/analysis/question/with-file",
@@ -412,21 +397,42 @@ export const analysisApi = {
           },
           onUploadProgress: (progressEvent) => {
             if (onUploadProgress && progressEvent.total) {
-              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
               onUploadProgress(percentCompleted);
             }
           },
         }
       );
-      
-      // Once file is uploaded, stream the response
-      onTokenCallback("\n\n");
-      onTokenCallback(uploadResponse.data.answer);
-      
+
+      // Once file is uploaded, show response
+      onTokenCallback("PROCESSING_END");
+      const response = uploadResponse.data.answer;
+
+      // Ensure response is a valid string before splitting
+      let responseText: string;
+      if (!response || typeof response !== "string") {
+        responseText =
+          "File uploaded successfully, but I couldn't generate a proper response. Please try asking your question again.";
+      } else {
+        responseText = response;
+      }
+
+      const words = responseText.split(" ");
+
+      // simulate the sreaming of tokens
+      for (let i = 0; i < words.length; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        onTokenCallback(words[i] + (i < words.length - 1 ? " " : ""));
+      }
+
       return true;
     } catch (error) {
       console.error("Error in streamQuestionWithFile API call:", error);
-      onTokenCallback("\nError: Failed to process file and stream response. Please try again.");
+      onTokenCallback(
+        "\nError: Failed to process file and stream response. Please try again."
+      );
       return false;
     }
   },
@@ -469,6 +475,16 @@ export const fileApi = {
   deleteFile: async (fileId: string) => {
     const response = await api.delete(`/files/${fileId}`);
     return response.data;
+  },
+
+  downloadFile: async (fileId: string) => {
+    const response = await api.get(`/files/${fileId}/download`, {
+      responseType: "blob",
+    });
+    if (response.status !== 200) {
+      throw new Error("Failed to download file");
+    }
+    return response;
   },
 };
 

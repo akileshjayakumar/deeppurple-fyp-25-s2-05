@@ -91,7 +91,7 @@ async def upload_file_to_s3(
         if isinstance(file, UploadFile):
             original_filename = file.filename or "file.bin"
             logger.info(f"Processing UploadFile: {original_filename}, content_type: {getattr(file, 'content_type', 'unknown')}")
-            
+
             # Read the file content directly
             try:
                 file_content = await file.read()
@@ -138,13 +138,13 @@ async def upload_file_to_s3(
             'aws_secret_access_key': settings.AWS_SECRET_ACCESS_KEY,
             'region_name': settings.AWS_REGION
         }
-        
+
         if settings.AWS_ENDPOINT_URL:
             s3_client_args['endpoint_url'] = settings.AWS_ENDPOINT_URL
-            
+
         # Create aioboto3 session
         session = aioboto3.Session()
-        
+
         # Ensure file_content is bytes before uploading
         if not isinstance(file_content, bytes):
             logger.warning(f"file_content is not bytes, it's {type(file_content)}. Converting if possible.")
@@ -157,12 +157,12 @@ async def upload_file_to_s3(
             elif isinstance(file_content, str):
                 logger.info("Converting string to bytes")
                 file_content = file_content.encode('utf-8')
-                
+
         # Final check to ensure we have bytes
         if not isinstance(file_content, bytes):
             logger.error(f"Failed to convert file_content to bytes, type is {type(file_content)}")
             raise ValueError(f"Cannot upload content of type {type(file_content)} to S3")
-        
+
         async with session.client("s3", **s3_client_args) as s3_client:
             logger.info(f"Uploading to S3 with content type: {getattr(file, 'content_type', 'application/octet-stream') if isinstance(file, UploadFile) else 'application/octet-stream'}")
             await s3_client.put_object(
@@ -292,7 +292,7 @@ async def generate_presigned_url(s3_key: str, expiration: int = 3600) -> str:
             )
         )
 
-        logger.debug(f"Generated presigned URL: {presigned_url}")
+        logger.info(f"Generated presigned URL: {presigned_url}")
         return presigned_url
 
     except ClientError as e:
@@ -301,3 +301,35 @@ async def generate_presigned_url(s3_key: str, expiration: int = 3600) -> str:
     except Exception as e:
         logger.error(f"Error in generate_presigned_url: {str(e)}")
         return ""
+
+async def download_file_from_s3(s3_key: str) -> Dict[str, Any]:
+    """
+    Get the file from S3 storage as a stream, used to create streaming response.
+
+    args:
+        s3_key: The key (path) of the file in S3
+
+    Returns:
+        BinaryIO: A stream containing the file data
+    Raises:
+        HTTPException: If the file is not found or if there is an error during download
+    """
+    try:
+        s3_client = get_s3_client()
+        bucket_name = settings.AWS_S3_BUCKET_NAME
+
+        logger.info(f"Downloading file from S3: {s3_key}")
+        s3_object = s3_client.get_object(Bucket=bucket_name, Key=s3_key)
+        file_stream = s3_object['Body']
+        return file_stream
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code == 'NoSuchKey':
+            logger.error(f"File not found in S3: {s3_key}")
+            raise HTTPException(status_code=404, detail="File not found")
+        else:
+            logger.error(f"S3 client error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"S3 client error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error in download_file_from_s3: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error downloading file: {str(e)}")

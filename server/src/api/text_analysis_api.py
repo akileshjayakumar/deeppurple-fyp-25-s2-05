@@ -648,7 +648,8 @@ async def stream_question_answer(
 
     # Create conversation history in reverse chronological order (oldest first)
     conversation_history = [
-        {"question": q.question_text, "answer": q.answer_text}
+        {"question": q.question_text, "answer": q.answer_text} if not q.chart_data else
+        {"question": q.question_text, "answer": f'{q.answer_text}: {q.chart_data}'}
         for q in reversed(previous_questions)
     ]
 
@@ -992,7 +993,7 @@ async def ask_question_with_file(
         # Store the question and answer
         question_record = Question(
             session_id=session.id,
-            question_text=question,
+            question_text=f"[File: {file.filename}] {question}".strip(),
             answer_text=answer_text
         )
         db.add(question_record)
@@ -1015,7 +1016,7 @@ async def ask_question_with_file(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing question with file: {str(e)}"
         )
-    
+
 @router.post("/question/visualize")
 async def visualize_question(
     session_id:str = Form(...),
@@ -1027,7 +1028,7 @@ async def visualize_question(
     db: Session = Depends(get_db)
 ):
     """
-    This is an endpoint to save the visualization question-answer pair 
+    This is an endpoint to save the visualization question-answer pair
     in the database.
 
     There is an endpoint specifically for saving the visualization question and answer pair becaause it is different from the regular question-answer pairs.
@@ -1038,7 +1039,7 @@ async def visualize_question(
 
     I DO NOT want to
     1. Keep making calls to AI for every visualization when we can consolidate it into one call and proccess it on the front end
-    
+
     2. For each question and answer pair, have the chart data be the entire super set of data instead of the relevant subset
     """
 
@@ -1057,7 +1058,7 @@ async def visualize_question(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found"
         )
-    
+
     # Validate chart data and type
     if not chart_data or not chart_type:
         logger.error("Chart data and type must be provided")
@@ -1096,9 +1097,9 @@ async def visualize_question(
         "question_text": question_record.question_text,
         "answer_text": question_record.answer_text,
         "chart_data": question_record.chart_data,
-        "chart_type": question_record.chart_type    
+        "chart_type": question_record.chart_type
     }
-    
+
 
 
 @router.post("/visualize/last-file", response_model=schemas.QuestionDataVisualization)
@@ -1173,11 +1174,11 @@ async def visualize_last_file(
         except Exception as e:
             logger.error(f"Error answering question: {str(e)}")
             logger.error(traceback.format_exc())
-        
+
 
         # Return the response with visualization
         return analysis_results
-    
+
     except HTTPException:
         # Re-raise HTTP exceptions
         raise

@@ -1,6 +1,7 @@
 import os
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File as FastAPIFile, Form
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import magic
 import traceback
@@ -9,7 +10,7 @@ from schemas import schemas
 from core.auth import get_current_active_user
 from core.database import get_db
 from models.models import User, Session as SessionModel, File, FileContent
-from utils.s3 import upload_file_to_s3, get_file_from_s3, delete_file_from_s3, generate_presigned_url
+from utils.s3 import upload_file_to_s3, get_file_from_s3, delete_file_from_s3, generate_presigned_url,download_file_from_s3
 from utils.file_parsers import parse_file_content
 from utils.logger import logger
 
@@ -43,7 +44,7 @@ async def upload_file(
     Upload a file to a session.
 
     This endpoint allows the authenticated user to upload a file (TXT, CSV, or PDF)
-    to a specific session. The file is stored in S3 and its content is parsed and 
+    to a specific session. The file is stored in S3 and its content is parsed and
     stored in the database for analysis.
     """
     logger.info(
@@ -358,3 +359,28 @@ async def get_file_download_url(
     url = await generate_presigned_url(file.s3_key)
 
     return {"download_url": url, "expires_in": 3600}
+
+@router.get("/{file_id}/download")
+async def download_file(
+    file_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    file = db.query(File).join(SessionModel).filter(
+        File.id == file_id,
+        SessionModel.user_id == current_user.id
+    ).first()
+
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Download file from S3 (async or sync as needed)
+    file_stream = await download_file_from_s3(file.s3_key)
+
+    return StreamingResponse(
+        file_stream,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{file.filename}"'
+        }
+    )
