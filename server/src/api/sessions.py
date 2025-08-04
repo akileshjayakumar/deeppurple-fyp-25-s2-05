@@ -22,7 +22,7 @@ from models.models import User, Session as SessionModel, File, Insight, Question
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER,TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 
@@ -227,6 +227,8 @@ async def list_session_files(
     return files
 
 # TODO: update this endpoint for the new visualization system (INSIGHTS TAB)
+
+
 @router.get("/{session_id}/insights", response_model=List[schemas.InsightResponse])
 async def list_session_insights(
     session_id: int,
@@ -521,15 +523,17 @@ async def export_session_to_csv(
             "content": msg.question_text
         })
 
-        # Include chart data only if available -> Visualization message
+        # Include chart data if available -> Visualization message
         if msg.chart_data:
+            chart_type_prefix = (msg.chart_type or "Chart") + ": "
             data.append({
                 "timestamp": msg.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 "role": "assistant",
-                "content": msg.chart_type + ": " + json.dumps(msg.chart_data),
+                "content": chart_type_prefix + json.dumps(msg.chart_data),
             })
 
-        elif msg.answer_text:
+        # Include answer text if available (independent of chart data)
+        if msg.answer_text:
             data.append({
                 "timestamp": msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S"),
                 "role": "assistant",
@@ -601,7 +605,8 @@ async def export_session_to_markdown(
 
         # Add assistant response if available
         elif msg.answer_text:
-            timestamp = msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            timestamp = msg.answered_at.strftime(
+                "%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
             md_content += f"## Assistant ({timestamp})\n\n"
             md_content += f"{msg.answer_text}\n\n"
             md_content += "---\n\n"
@@ -662,7 +667,6 @@ async def export_session_to_pdf(
         alignment=TA_CENTER,
     )
 
-
     small_grey_right_style = ParagraphStyle(
         name="SmallGreyRight",
         parent=styles["Normal"],
@@ -676,45 +680,51 @@ async def export_session_to_pdf(
     # Add title and timestamp
     title_style = styles["Title"]
     elements.append(Paragraph(f"Session: {session.name}", title_style))
-    elements.append(Paragraph(f"Exported on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", centered_style))
+    elements.append(Paragraph(
+        f"Exported on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", centered_style))
     elements.append(Spacer(1, 6))
 
     # Add conversation content
     for msg in messages:
         # Add user question
-        user_question_formatted = msg.question_text.replace('\n','<br/>')
+        user_question_formatted = msg.question_text.replace('\n', '<br/>')
         elements.append(Paragraph("<b>User</b>", styles["Heading2"]))
         elements.append(Paragraph(user_question_formatted, styles["Normal"]))
 
         # Footer
-        elements.append(Paragraph(msg.created_at.strftime('%Y-%m-%d %H:%M:%S'), small_grey_right_style))
+        elements.append(Paragraph(msg.created_at.strftime(
+            '%Y-%m-%d %H:%M:%S'), small_grey_right_style))
         elements.append(Spacer(1, 6))
-
 
         # Include chart data if available
         if msg.chart_data:
             # Add visualization message
-            elements.append(Paragraph(f"<b>Visualization: {msg.chart_type.replace('_', ' ')}</b>", styles["Heading2"]))
+            elements.append(Paragraph(
+                f"<b>Visualization: {msg.chart_type.replace('_', ' ')}</b>", styles["Heading2"]))
 
             # Chart
-            elements.append(Spacer(1,3))
-            image_bytes = generate_chart_from_data(msg.chart_data, msg.chart_type)
+            elements.append(Spacer(1, 3))
+            image_bytes = generate_chart_from_data(
+                msg.chart_data, msg.chart_type)
             elements.append(create_reportlab_image(image_bytes=image_bytes))
-            elements.append(Spacer(1,3))
+            elements.append(Spacer(1, 3))
 
             # Footer
-            elements.append(Paragraph(msg.created_at.strftime('%Y-%m-%d %H:%M:%S'), small_grey_right_style))
+            elements.append(Paragraph(msg.created_at.strftime(
+                '%Y-%m-%d %H:%M:%S'), small_grey_right_style))
             elements.append(Spacer(1, 6))
 
         # Add assistant response if available
         elif msg.answer_text:
-            timestamp = msg.answered_at.strftime("%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            timestamp = msg.answered_at.strftime(
+                "%Y-%m-%d %H:%M:%S") if msg.answered_at else msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
             elements.append(Paragraph(f"<b>Assistant</b>", styles["Heading2"]))
-            formatted_elements = markdown_to_reportlab_paragraphs(msg.answer_text, styles)
+            formatted_elements = markdown_to_reportlab_paragraphs(
+                msg.answer_text, styles)
             elements.extend(formatted_elements)
 
             # Footer
-            elements.append(Paragraph(timestamp,small_grey_right_style))
+            elements.append(Paragraph(timestamp, small_grey_right_style))
             elements.append(Spacer(1, 6))
 
     # Build the PDF
