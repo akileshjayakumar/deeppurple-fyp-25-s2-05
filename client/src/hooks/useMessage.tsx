@@ -40,11 +40,15 @@ export function useMessage() {
         const loadingToast = toast.loading("Sending message..")
 
         // Check if message is first in session -> Can be improved to just handle on backend
+        // Renames session in session manager
         try {
             const currentSessionData = await sessionApi.getSessionById(currentSessionId);
             if (currentSessionData?.name === "New Conversation" && inputValue.trim()) {
                 // Update session name if it's still "New Conversation"
-                await sessionApi.updateSession(currentSessionId, { name: inputValue.trim() });
+                const sessionName = inputValue.trim().length > 50
+                    ? inputValue.trim().substring(0, 50) + "..."
+                    : inputValue.trim();
+                await sessionApi.updateSession(currentSessionId, { name: sessionName });
             }
         } catch (error) {
             console.error("Failed to update session name:", error);
