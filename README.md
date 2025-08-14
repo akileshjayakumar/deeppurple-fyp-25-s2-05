@@ -32,9 +32,11 @@ DeepPurple fills this gap with a SaaS-based, AI-powered communication analysis p
 
 ## Project Tech Stack
 
-- Frontend: React, Tailwind CSS, Shadcn UI
+- Frontend: Next.js, Tailwind CSS, Shadcn UI
 - Backend/Database: FastAPI, PostgreSQL
-- GenAI: OpenAI, Langchain
+- GenAI: OpenAI, LangChain
+- Hosting: AWS
+- Containerization: Docker
 
 ## Links
 
