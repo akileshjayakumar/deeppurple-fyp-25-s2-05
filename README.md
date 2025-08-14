@@ -30,15 +30,6 @@ DeepPurple fills this gap with a SaaS-based, AI-powered communication analysis p
 - To create a SaaS-based, AI-powered communication analysis platform that automates emotion detection, summarisation, and insight generation.
 - To enable both professionals and teams to understand their clients with clarity, speed, and scale.
 
-## Project Features
-
-- Emotion detection
-- Sentiment analysis
-- Topic modelling
-- Entity recognition
-- Text summarisation
-- Time-series analysis
-
 ## Project Tech Stack
 
 - Frontend: React, Tailwind CSS, Shadcn UI
